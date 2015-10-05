@@ -2,7 +2,7 @@
 #define RAWINPUT_H_
 
 #include <windows.h>
-#include <detours.h> // Required for function hooking
+#include "detours.h" // Required for function hooking
 
 #define RAWINPUTHDRSIZE sizeof(RAWINPUTHEADER)
 #define RAWPTRSIZE 40
@@ -12,6 +12,8 @@
 #pragma warning(disable: 4100)
 
 /**
+ * Note from original author (abort):
+ * ----------------------------------
  * Sadly everything has been made static, as Win32 API does not support object oriented callbacks, as it has been written in C.
  * To keep the performance as high as possible, I decided not to work with storing the class instance through Win32 API. 
  * Feel free to rewrite this to something more clean in coding terms :).
@@ -44,6 +46,8 @@ public:
 private:
 	static long x;
 	static long y;
+	static long set_x;
+	static long set_y;
 
 	static HWND hwndInput;
 	static bool bRegistered;
