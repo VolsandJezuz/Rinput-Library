@@ -1,5 +1,15 @@
 /*
-	RInput allows you to override low definition windows mouse input with high definition mouse input.
+	This version of RInput was forked from abort's v1.31 by Vols and
+	Jezuz (http://steamcommunity.com/profiles/76561198057348857/), with
+	a lot of help from BuSheeZy (http://BushGaming.com) and qsxcv
+	(http://www.overclock.net/u/395745/qsxcv).
+	
+	------------------------------------------------------------------
+	Comments from original author, abort (http://blog.digitalise.net/)
+	------------------------------------------------------------------
+	
+	RInput allows you to override low definition windows mouse input
+	with high definition mouse input.
 
 	RInput Copyright (C) 2012, J. Dijkstra (abort@digitalise.net)
 

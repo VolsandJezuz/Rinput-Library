@@ -1,23 +1,27 @@
-RInput Library v1.31
-----------------------------------
+RInput Library v1.32 by Vols and Jezuz
+--------------------------------------
 RInput allows you to override low definition windows mouse input (accurate untill 400cpi) with high definition mouse input (raw input, which is more accurate for high cpi mice). This is certainly useful for older games as those engines only support low definition windows mouse input.
 
 Note:
-----------------------------------
-Sorry for posting the source this late, I never found the time to find the correct backup, write some comments and add a licensing. The injector still might become open source if I find the time some day.
-You can use my previous injector in case you just want to edit the source of the library. Otherwise you can use the instructions below with your own injection stub.
-
-The code as presented (the last version I released in 2009) supports X86 architecture only. After Valve embedded Raw Input into their games, I did not see the urge of rewriting the projects for the X64 architecture.
+--------------------------------------
+This is a fork of RInput Library v1.31 as originally authored by abort. x64 architecture support was never added by him, but here are some notes on what would need to be changed to accomplish this, in case someone is interested:
+- The detouring/hooking mechanism needs to support the x64 architectures. This is mainly due to the jumping mechanism for larger pointers. The jumps need to support the whole memory address span over 32-bit
+- The injector for RInput needs to support 64-bit injection and support for finding 64-bit processes
+- This library obviously has to get recompiled to 64-bit (might require some changes to Win32 API calls for the RInput HWND)
 
 Building:
-----------------------------------
-Compile with Visual Studio (or Visual C++ Express);
-- Link the library to MS Detours (MS Detours 1.5 was used back then; http://home.comcast.net/~wiccaan/downloads/Detours.rar)
-- Make sure you compile the library with a Multi-Byte Character Set
+--------------------------------------
+Compiled with Visual C++ 2008 Express Edition, though you may be able to get it to work with other versions or compilers (available for free @ https://go.microsoft.com/?linkid=7729279);
+- Pick Dynamic Library (.dll) as the configuration type
+- Compile using Multi-Byte Character Set
+- Add the Microsoft SDK (I used v6.0A that came with VC++2008) folders as additional Include directory and additional linker library directory
+- Compiled with Multi-threaded DLL runtime library for linking
+- Use x86 architecture for compiling (i.e., RInput does not support for x64 applications)
+- MS Detours 1.5 header and library were acquired from http://home.comcast.net/~wiccaan/downloads/Detours.rar
 
 How it works:
-----------------------------------
-As most of the developers are not into Win32 API these days, I'll just sum up how the process works:
+--------------------------------------
+Summary of the process by the original author:
 
 1. The library gets injected into a process by an injector
 2. The injector creates a windows event to communicate with the injected library
@@ -27,6 +31,8 @@ As most of the developers are not into Win32 API these days, I'll just sum up ho
 6. The injector gives the user feedback, based on whether the event was raised or not
 
 Credits:
-----------------------------------
+--------------------------------------
+BuSheeZy - helping me understand Visual C++ IDE and Git
+qsxcv - ideas for how to improve the mouse data handling and information about how mouse input works
+about - original author
 Dr3am - for the icons
-Microsoft - for preventing me from writing my own detour/hooking stub

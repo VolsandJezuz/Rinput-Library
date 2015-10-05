@@ -1,5 +1,15 @@
 /*
-	RInput allows you to override low definition windows mouse input with high definition mouse input.
+	This version of RInput was forked from abort's v1.31 by Vols and
+	Jezuz (http://steamcommunity.com/profiles/76561198057348857/), with
+	a lot of help from BuSheeZy (http://BushGaming.com) and qsxcv
+	(http://www.overclock.net/u/395745/qsxcv).
+	
+	------------------------------------------------------------------
+	Comments from original author, abort (http://blog.digitalise.net/)
+	------------------------------------------------------------------
+	
+	RInput allows you to override low definition windows mouse input
+	with high definition mouse input.
 
 	RInput Copyright (C) 2012, J. Dijkstra (abort@digitalise.net)
 
@@ -30,6 +40,8 @@ bool CRawInput::bRegistered = false;
 HWND CRawInput::hwndInput = NULL;
 long CRawInput::x = 0;
 long CRawInput::y = 0;
+long CRawInput::set_x = 0;
+long CRawInput::set_y = 0;
 
 bool CRawInput::initialize(WCHAR* pwszError) 
 {
@@ -79,7 +91,11 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 bool CRawInput::initInput(WCHAR* pwszError) 
 {
 	// Set default coordinates
-	CRawInput::x = CRawInput::y = 0;
+	LPPOINT defCor = new tagPOINT;
+	GetPhysicalCursorPos(defCor);
+	PhysicalToLogicalPoint(hwndInput, defCor);
+	CRawInput::x = defCor->x;
+	CRawInput::y = defCor->y;
 	
 	RAWINPUTDEVICE rMouse;
 	memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
@@ -145,8 +161,8 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 {
 	if (!TrmpSetCursorPos(x, y)) return 1;
 
-	CRawInput::x = (long)x;
-	CRawInput::y = (long)y;
+	CRawInput::set_x = (long)x;
+	CRawInput::set_y = (long)y;
 
 #ifdef _DEBUG
 	OutputDebugString("Set coordinates");
@@ -159,6 +175,9 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
 	lpPoint->x = CRawInput::x;
 	lpPoint->y = CRawInput::y;
+
+	CRawInput::x = CRawInput::set_x;
+	CRawInput::y = CRawInput::set_y;
 
 #ifdef _DEBUG
 	OutputDebugString("Returned coordinates");
