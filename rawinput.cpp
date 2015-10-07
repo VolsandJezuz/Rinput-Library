@@ -102,6 +102,7 @@ bool CRawInput::initInput(WCHAR* pwszError)
 	
 	RAWINPUTDEVICE rMouse;
 	memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
+	
 	rMouse.dwFlags = 0;
 	rMouse.hwndTarget = CRawInput::hwndInput;
 	rMouse.usUsagePage = 0x01;
