@@ -1,8 +1,8 @@
 #ifndef _VERSIONINFO_H_
 #define _VERSIONINFO_H_
 
-#define RINPUTVER "v1.32"
-#define RINPUTFVER 1,32
+#define RINPUTVER "v1.33"
+#define RINPUTFVER 1,33
 #define IDI_ICON 101
 
 #define RINPUTINT "RInput"

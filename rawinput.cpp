@@ -42,6 +42,7 @@ long CRawInput::x = 0;
 long CRawInput::y = 0;
 long CRawInput::set_x = 0;
 long CRawInput::set_y = 0;
+bool CRawInput::s = false;
 
 bool CRawInput::initialize(WCHAR* pwszError) 
 {
@@ -91,15 +92,16 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 bool CRawInput::initInput(WCHAR* pwszError) 
 {
 	// Set default coordinates
+	CRawInput::x = CRawInput::y = CRawInput::set_x = CRawInput::set_y = 0;
+	HWND hwndGame = GetForegroundWindow();
 	LPPOINT defCor = new tagPOINT;
 	GetPhysicalCursorPos(defCor);
-	PhysicalToLogicalPoint(hwndInput, defCor);
-	CRawInput::x = defCor->x;
-	CRawInput::y = defCor->y;
+	PhysicalToLogicalPoint(hwndGame, defCor);
+	CRawInput::set_x = defCor->x;
+	CRawInput::set_y = defCor->y;
 	
 	RAWINPUTDEVICE rMouse;
 	memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
-
 	rMouse.dwFlags = 0;
 	rMouse.hwndTarget = CRawInput::hwndInput;
 	rMouse.usUsagePage = 0x01;
@@ -163,6 +165,7 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 
 	CRawInput::set_x = (long)x;
 	CRawInput::set_y = (long)y;
+	CRawInput::s = true;
 
 #ifdef _DEBUG
 	OutputDebugString("Set coordinates");
@@ -173,11 +176,15 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 
 int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
-	lpPoint->x = CRawInput::x;
-	lpPoint->y = CRawInput::y;
-
-	CRawInput::x = CRawInput::set_x;
-	CRawInput::y = CRawInput::set_y;
+	lpPoint->x = CRawInput::set_x + CRawInput::x;
+	lpPoint->y = CRawInput::set_y + CRawInput::y;
+	
+	if (CRawInput::s)
+	{
+		CRawInput::x = 0;
+		CRawInput::y = 0;
+		CRawInput::s = false;
+	}
 
 #ifdef _DEBUG
 	OutputDebugString("Returned coordinates");
@@ -230,7 +237,7 @@ void CRawInput::unload()
 
 		RegisterRawInputDevices(&rMouse, 1, sizeof(RAWINPUTDEVICE));
 		DestroyWindow(hwndInput);
-
+		
 #ifdef _DEBUG
 		OutputDebugString("Unregistered mouse device");
 		OutputDebugString("Closed Input Window");
