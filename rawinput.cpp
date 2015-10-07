@@ -238,7 +238,7 @@ void CRawInput::unload()
 
 		RegisterRawInputDevices(&rMouse, 1, sizeof(RAWINPUTDEVICE));
 		DestroyWindow(hwndInput);
-		
+
 #ifdef _DEBUG
 		OutputDebugString("Unregistered mouse device");
 		OutputDebugString("Closed Input Window");
