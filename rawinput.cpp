@@ -70,7 +70,7 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 		lstrcpyW(pwszError, L"Failed to register input window!");
 		return false;
 	}
-	
+
 	// Create the window to catch WM_INPUT events	
 	CRawInput::hwndInput = CreateWindowEx(NULL, INPUTWINDOW, INPUTWINDOW, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL);
 	if (!CRawInput::hwndInput) 
@@ -99,10 +99,10 @@ bool CRawInput::initInput(WCHAR* pwszError)
 	PhysicalToLogicalPoint(hwndGame, defCor);
 	CRawInput::set_x = defCor->x;
 	CRawInput::set_y = defCor->y;
-	
+
 	RAWINPUTDEVICE rMouse;
 	memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
-	
+
 	rMouse.dwFlags = 0;
 	rMouse.hwndTarget = CRawInput::hwndInput;
 	rMouse.usUsagePage = 0x01;
@@ -179,7 +179,7 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
 	lpPoint->x = CRawInput::set_x + CRawInput::x;
 	lpPoint->y = CRawInput::set_y + CRawInput::y;
-	
+
 	if (CRawInput::s)
 	{
 		CRawInput::x = 0;
