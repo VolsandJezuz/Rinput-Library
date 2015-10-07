@@ -49,13 +49,6 @@ private:
 	static long set_x;
 	static long set_y;
 	static bool s;
-	//static int arrCRawInputx [1000];
-	//static int arrCRawInputy [1000];
-	//static int arrIteration;
-	//static bool started;
-
-	//static int SCPDisagree;
-	//static int GCPDisagree;
 
 	static HWND hwndInput;
 	static bool bRegistered;
