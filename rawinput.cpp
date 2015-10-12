@@ -93,10 +93,8 @@ bool CRawInput::initInput(WCHAR* pwszError)
 {
 	// Set default coordinates
 	CRawInput::x = CRawInput::y = CRawInput::set_x = CRawInput::set_y = 0;
-	HWND hwndGame = GetForegroundWindow();
 	LPPOINT defCor = new tagPOINT;
-	GetPhysicalCursorPos(defCor);
-	PhysicalToLogicalPoint(hwndGame, defCor);
+	GetCursorPos(defCor);
 	CRawInput::set_x = defCor->x;
 	CRawInput::set_y = defCor->y;
 
@@ -177,6 +175,7 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 
 int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
+
 	lpPoint->x = CRawInput::set_x + CRawInput::x;
 	lpPoint->y = CRawInput::set_y + CRawInput::y;
 
