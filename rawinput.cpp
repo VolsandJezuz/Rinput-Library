@@ -44,7 +44,7 @@ long CRawInput::set_x = 0;
 long CRawInput::set_y = 0;
 bool CRawInput::s = false;
 
-bool CRawInput::initialize(WCHAR* pwszError) 
+bool CRawInput::initialize(WCHAR* pwszError)
 {
 	if (!initWindow(pwszError))
 		return false;
@@ -55,7 +55,7 @@ bool CRawInput::initialize(WCHAR* pwszError)
 	return true;
 }
 
-bool CRawInput::initWindow(WCHAR* pwszError) 
+bool CRawInput::initWindow(WCHAR* pwszError)
 {
 	// Register the window to catch WM_INPUT events
 	WNDCLASSEX wcex;
@@ -89,7 +89,7 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 	return true;
 }
 
-bool CRawInput::initInput(WCHAR* pwszError) 
+bool CRawInput::initInput(WCHAR* pwszError)
 {
 	// Set default coordinates
 	CRawInput::x = CRawInput::y = CRawInput::set_x = CRawInput::set_y = 0;
@@ -115,7 +115,7 @@ bool CRawInput::initInput(WCHAR* pwszError)
 	return (bRegistered = true);
 }
 
-unsigned int CRawInput::pollInput() 
+unsigned int CRawInput::pollInput()
 {
 	MSG msg;
 
