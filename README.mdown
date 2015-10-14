@@ -13,7 +13,7 @@ This is a fork of RInput Library v1.31 as originally authored by abort. x64 arch
 - This library obviously has to get recompiled to 64-bit (might require some changes to Win32 API calls for the RInput HWND)
 
 ## Building
-Compiled with Visual C++ 2008 Express Edition, though you may be able to get it to work with other versions or compilers (available for free @ https://go.microsoft.com/?linkid=7729279);
+Compiled with Visual Studio 2008, though you may be able to get it to work with other versions or compilers (Visual C++ 2008 Express Edition is available for free @ https://go.microsoft.com/?linkid=7729279);
 - Pick Dynamic Library (.dll) as the configuration type
 - Compile using Multi-Byte Character Set
 - Add the Microsoft SDK (I used v6.0A that came with VS2008/VC++2008) folders as additional Include directory and additional linker library directory
