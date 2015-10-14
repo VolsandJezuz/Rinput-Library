@@ -1,5 +1,10 @@
-# RInput Library v1.33 by Vols and Jezuz
+# RInput Library v1.34 by Vols and Jezuz
 RInput allows you to override low definition windows mouse input (accurate untill 400cpi) with high definition mouse input (raw input, which is more accurate for high cpi mice). This is certainly useful for older games as those engines only support low definition windows mouse input.
+
+## Requirements
+- OS: Windows XP or later
+- CPU: Intel Pentium III or later; or, AMD Opteron, Athlon 64 or later
+- Microsoft Visual C++ 2008 Redistributable - x86 9.0.21022.218 or later (included in RInput release downloads starting with v1.34)
 
 ## Note
 This is a fork of RInput Library v1.31 as originally authored by abort. x64 architecture support was never added by him, but here are some notes on what would need to be changed to accomplish this, in case someone is interested:
@@ -11,8 +16,9 @@ This is a fork of RInput Library v1.31 as originally authored by abort. x64 arch
 Compiled with Visual C++ 2008 Express Edition, though you may be able to get it to work with other versions or compilers (available for free @ https://go.microsoft.com/?linkid=7729279);
 - Pick Dynamic Library (.dll) as the configuration type
 - Compile using Multi-Byte Character Set
-- Add the Microsoft SDK (I used v6.0A that came with VC++2008) folders as additional Include directory and additional linker library directory
+- Add the Microsoft SDK (I used v6.0A that came with VS2008/VC++2008) folders as additional Include directory and additional linker library directory
 - Compiled with Multi-threaded DLL runtime library for linking
+- Set the Entry Point as DllMain
 - Use x86 architecture for compiling (i.e., RInput does not support for x64 applications)
 - MS Detours 1.5 header and library were acquired from http://home.comcast.net/~wiccaan/downloads/Detours.rar
 
@@ -27,7 +33,7 @@ Summary of the process by the original author:
 6. The injector gives the user feedback, based on whether the event was raised or not
 
 ## Credits:
-BuSheeZy - helping me understand Visual C++ IDE and Git
-qsxcv - ideas for how to improve the mouse data handling and information about how mouse input works
-about - original author
-Dr3am - for the icons
+- BuSheeZy - helping me understand Visual C++ IDE and Git
+- qsxcv - ideas for how to improve the mouse data handling and information about how mouse input works
+- about - original author
+- Dr3am - for the icons

@@ -93,6 +93,8 @@ bool CRawInput::initInput(WCHAR* pwszError)
 {
 	// Set default coordinates
 	CRawInput::x = CRawInput::y = CRawInput::set_x = CRawInput::set_y = 0;
+	
+	// Update from v1.31, with the initial raw input data accumulators set to the starting cursor position
 	LPPOINT defCor = new tagPOINT;
 	GetCursorPos(defCor);
 	CRawInput::set_x = defCor->x;
@@ -179,6 +181,7 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	lpPoint->x = CRawInput::set_x + CRawInput::x;
 	lpPoint->y = CRawInput::set_y + CRawInput::y;
 
+	// raw input data accumulator resets have moved here from hSetCursorPos,  so raw input data occurring between GetCursorPos/SetCursorPos paired calls is not lost
 	if (CRawInput::s)
 	{
 		CRawInput::x = 0;

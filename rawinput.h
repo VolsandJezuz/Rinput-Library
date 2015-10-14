@@ -46,8 +46,12 @@ public:
 private:
 	static long x;
 	static long y;
+	
+	// mouse data handling is now split between set_x/y (stores the SetCursorPos starting point) and x/y (accumulates the raw input data), which add together as the next GetCursorPos offset
 	static long set_x;
 	static long set_y;
+	
+	// toggle so raw input data is not reset when SetCursorPos isn't called after GetCursorPos, which fixes the odd behavior RInput used to have in TF2's backpack and some game menus
 	static bool s;
 
 	static HWND hwndInput;

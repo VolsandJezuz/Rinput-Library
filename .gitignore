@@ -3,4 +3,6 @@ RInput.sln
 RInput.suo
 RInput.vcproj.*
 Release/
+versioninfo.aps
 .gitconfig
+.gitignore
