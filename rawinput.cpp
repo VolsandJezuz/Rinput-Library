@@ -42,7 +42,6 @@ long CRawInput::x = 0;
 long CRawInput::y = 0;
 long CRawInput::set_x = 0;
 long CRawInput::set_y = 0;
-bool CRawInput::s = false;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
@@ -166,7 +165,6 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 
 	CRawInput::set_x = (long)x;
 	CRawInput::set_y = (long)y;
-	CRawInput::s = true;
 
 #ifdef _DEBUG
 	OutputDebugString("Set coordinates");
@@ -178,16 +176,14 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
 
-	lpPoint->x = CRawInput::set_x + CRawInput::x;
-	lpPoint->y = CRawInput::set_y + CRawInput::y;
+	CRawInput::set_x += CRawInput::x;
+	CRawInput::set_y += CRawInput::y;
+	lpPoint->x = CRawInput::set_x;
+	lpPoint->y = CRawInput::set_y;
 
 	// raw input data accumulator resets have moved here from hSetCursorPos,  so raw input data occurring between GetCursorPos/SetCursorPos paired calls is not lost
-	if (CRawInput::s)
-	{
-		CRawInput::x = 0;
-		CRawInput::y = 0;
-		CRawInput::s = false;
-	}
+	CRawInput::x = 0;
+	CRawInput::y = 0;
 
 #ifdef _DEBUG
 	OutputDebugString("Returned coordinates");

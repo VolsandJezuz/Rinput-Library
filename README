@@ -1,4 +1,4 @@
-RInput Library v1.34 by Vols and Jezuz
+RInput Library v1.35 by Vols and Jezuz
 --------------------------------------
 RInput allows you to override low definition windows mouse input (accurate untill 400cpi) with high definition mouse input (raw input, which is more accurate for high cpi mice). This is certainly useful for older games as those engines only support low definition windows mouse input.
 
