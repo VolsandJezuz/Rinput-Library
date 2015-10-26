@@ -29,6 +29,7 @@ public:
 	// Hooked functions handling
 	static int __stdcall hGetCursorPos(LPPOINT lpPoint);
 	static int __stdcall hSetCursorPos(int x, int y);
+	static int __stdcall hQueryPerformanceCounter(LARGE_INTEGER *lpPerformanceCount);
 
 	// Poll Input
 	static unsigned int pollInput();
@@ -46,10 +47,11 @@ public:
 private:
 	static long x;
 	static long y;
-	
-	// mouse data handling is now split between set_x/y (stores the SetCursorPos starting point) and x/y (accumulates the raw input data), which add together as the next GetCursorPos offset
 	static long set_x;
 	static long set_y;
+	static long hold_x;
+	static long hold_y;
+	static int SCP;
 
 	static HWND hwndInput;
 	static bool bRegistered;

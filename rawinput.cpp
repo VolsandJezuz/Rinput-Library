@@ -31,9 +31,9 @@
 
 #include "rawinput.h"
 
-// define the to be hooked functions
+// Define the to be hooked functions
 extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpGetCursorPos(LPPOINT lpPoint), GetCursorPos);
-extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpSetCursorPos(int X, int Y), SetCursorPos);
+extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpSetCursorPos(int x, int y), SetCursorPos);
 
 // Initialize static variables
 bool CRawInput::bRegistered = false;
@@ -42,6 +42,9 @@ long CRawInput::x = 0;
 long CRawInput::y = 0;
 long CRawInput::set_x = 0;
 long CRawInput::set_y = 0;
+long CRawInput::hold_x = 0;
+long CRawInput::hold_y = 0;
+int CRawInput::SCP = 0;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
@@ -92,8 +95,8 @@ bool CRawInput::initInput(WCHAR* pwszError)
 {
 	// Set default coordinates
 	CRawInput::x = CRawInput::y = CRawInput::set_x = CRawInput::set_y = 0;
-	
-	// Update from v1.31, with the initial raw input data accumulators set to the starting cursor position
+
+	// Raw input accumulators initialized to starting cursor position
 	LPPOINT defCor = new tagPOINT;
 	GetCursorPos(defCor);
 	CRawInput::set_x = defCor->x;
@@ -102,7 +105,8 @@ bool CRawInput::initInput(WCHAR* pwszError)
 	RAWINPUTDEVICE rMouse;
 	memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
 
-	rMouse.dwFlags = 0;
+	// New flag allows accumulation to be maintained while alt-tabbed
+	rMouse.dwFlags = RIDEV_INPUTSINK;
 	rMouse.hwndTarget = CRawInput::hwndInput;
 	rMouse.usUsagePage = 0x01;
 	rMouse.usUsage = 0x02;
@@ -166,6 +170,18 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 	CRawInput::set_x = (long)x;
 	CRawInput::set_y = (long)y;
 
+	++CRawInput::SCP;
+	CRawInput::set_x -= CRawInput::x;
+	CRawInput::set_y -= CRawInput::y;
+	if (CRawInput::SCP == 2)
+	{
+		CRawInput::SCP = 0;
+		CRawInput::set_x += CRawInput::x;
+		CRawInput::set_y += CRawInput::y;
+		CRawInput::hold_x = CRawInput::set_x;
+		CRawInput::hold_y = CRawInput::set_y;
+	}
+
 #ifdef _DEBUG
 	OutputDebugString("Set coordinates");
 #endif
@@ -175,13 +191,24 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 
 int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
+	CRawInput::SCP = 0;
 
+	// Split off raw input handling to accumulate independently
 	CRawInput::set_x += CRawInput::x;
 	CRawInput::set_y += CRawInput::y;
+	if ((CRawInput::set_x == 0) && (CRawInput::set_y == 0))
+	{
+		if ((CRawInput::x == 0) && (CRawInput::y == 0))
+		{
+			lpPoint->x = CRawInput::hold_x;
+			lpPoint->y = CRawInput::hold_y;
+			return 0;
+		}
+	}
 	lpPoint->x = CRawInput::set_x;
 	lpPoint->y = CRawInput::set_y;
 
-	// raw input data accumulator resets have moved here from hSetCursorPos,  so raw input data occurring between GetCursorPos/SetCursorPos paired calls is not lost
+	// Raw input accumulation resets moved here from hSetCursorPos
 	CRawInput::x = 0;
 	CRawInput::y = 0;
 
