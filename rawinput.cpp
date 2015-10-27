@@ -47,6 +47,10 @@ long CRawInput::hold_y = 0;
 int CRawInput::SCP = 0;
 bool CRawInput::GCP = false;
 bool CRawInput::sourceEXE = false;
+LARGE_INTEGER CRawInput::freq;
+LARGE_INTEGER CRawInput::old;
+LARGE_INTEGER CRawInput::older;
+double CRawInput::avg = 0;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
@@ -108,6 +112,7 @@ bool CRawInput::initInput(WCHAR* pwszError)
 		if ((std::string)szEXEPath == (std::string)*iSource_exes)
 		{
 			CRawInput::sourceEXE = true;
+			QueryPerformanceFrequency(&CRawInput::freq);
 			break;
 		}
 	}
@@ -185,7 +190,7 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 
 	CRawInput::set_x = (long)x;
 	CRawInput::set_y = (long)y;
-	
+
 	if (CRawInput::sourceEXE)
 	{
 		// Alt-tab bug fix
@@ -216,12 +221,43 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 
 int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
+	// Buy menu and escape menu bug fix
+	if (CRawInput::sourceEXE)
+	{
+		LARGE_INTEGER time;
+		if (!CRawInput::old.QuadPart)
+		{
+			QueryPerformanceCounter(&time);
+			CRawInput::old = time;
+		}
+		else if (!CRawInput::older.QuadPart)
+		{
+			QueryPerformanceCounter(&time);
+			CRawInput::older = CRawInput::old;
+			CRawInput::old = time;
+		}
+		else
+		{
+			QueryPerformanceCounter(&time);
+			double currFPS = (double)(CRawInput::freq.QuadPart / (time.QuadPart - CRawInput::old.QuadPart));
+			if (!CRawInput::avg)
+				CRawInput::avg = currFPS;
+			if (CRawInput::avg < 60)
+				CRawInput::avg = 60;
+			CRawInput::avg = ((30. * CRawInput::avg + currFPS) / 31.);
+			double adj = 0.30 * (CRawInput::avg) + 30.;
+			if ((double)time.QuadPart > (double)((adj + 1.) * CRawInput::old.QuadPart - adj * CRawInput::older.QuadPart))
+				CRawInput::GCP = true;
+			CRawInput::older = CRawInput::old;
+			CRawInput::old = time;
+		}
+	}
+
 	// Split off raw input handling to accumulate independently
 	CRawInput::set_x += CRawInput::x;
 	CRawInput::set_y += CRawInput::y;
 
 	CRawInput::SCP = 0;
-	// Alt-tab bug fix
 	if (!CRawInput::GCP)
 	{
 		lpPoint->x = CRawInput::set_x;
