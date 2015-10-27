@@ -46,6 +46,7 @@ long CRawInput::hold_x = 0;
 long CRawInput::hold_y = 0;
 int CRawInput::SCP = 0;
 bool CRawInput::GCP = false;
+bool CRawInput::sourceEXE = false;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
@@ -96,6 +97,20 @@ bool CRawInput::initInput(WCHAR* pwszError)
 {
 	// Set default coordinates
 	CRawInput::x = CRawInput::y = CRawInput::set_x = CRawInput::set_y = 0;
+
+	// Get process and enable bug fixes for source games
+	char szEXEPath[MAX_PATH];
+	char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", "left4dead.exe", "left4dead2.exe", "dota2.exe", "insurgency.exe", "p3.exe", "bms.exe", NULL};
+	GetModuleFileName(NULL, szEXEPath, sizeof(szEXEPath));
+	PathStripPath(szEXEPath);
+	for (char **iSource_exes = source_exes; *iSource_exes != NULL; ++iSource_exes)
+	{
+		if ((std::string)szEXEPath == (std::string)*iSource_exes)
+		{
+			CRawInput::sourceEXE = true;
+			break;
+		}
+	}
 
 	// Raw input accumulators initialized to starting cursor position
 	LPPOINT defCor = new tagPOINT;
@@ -170,21 +185,26 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 
 	CRawInput::set_x = (long)x;
 	CRawInput::set_y = (long)y;
-
-	if ((CRawInput::set_x == 0) && (CRawInput::set_y == 0))
-		CRawInput::GCP = true;
-
-	++CRawInput::SCP;
-	CRawInput::set_x -= CRawInput::x;
-	CRawInput::set_y -= CRawInput::y;
-	if (CRawInput::SCP == 2)
+	
+	if (CRawInput::sourceEXE)
 	{
-		CRawInput::GCP = false;
-		CRawInput::SCP = 0;
-		CRawInput::set_x += CRawInput::x;
-		CRawInput::set_y += CRawInput::y;
-		CRawInput::hold_x = CRawInput::set_x;
-		CRawInput::hold_y = CRawInput::set_y;
+		// Alt-tab bug fix
+		if ((CRawInput::set_x == 0) && (CRawInput::set_y == 0))
+			CRawInput::GCP = true;
+		// Console bug fix
+		++CRawInput::SCP;
+		if (CRawInput::SCP == 1)
+		{
+			CRawInput::set_x -= CRawInput::x;
+			CRawInput::set_y -= CRawInput::y;
+		}
+		else if (CRawInput::SCP == 2)
+		{
+			CRawInput::GCP = false;
+			CRawInput::SCP = 0;
+			CRawInput::hold_x = CRawInput::set_x;
+			CRawInput::hold_y = CRawInput::set_y;
+		}
 	}
 
 #ifdef _DEBUG
@@ -196,12 +216,12 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 
 int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
-	CRawInput::SCP = 0;
-
 	// Split off raw input handling to accumulate independently
 	CRawInput::set_x += CRawInput::x;
 	CRawInput::set_y += CRawInput::y;
 
+	CRawInput::SCP = 0;
+	// Alt-tab bug fix
 	if (!CRawInput::GCP)
 	{
 		lpPoint->x = CRawInput::set_x;
