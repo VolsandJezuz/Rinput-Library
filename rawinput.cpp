@@ -45,6 +45,7 @@ long CRawInput::set_y = 0;
 long CRawInput::hold_x = 0;
 long CRawInput::hold_y = 0;
 int CRawInput::SCP = 0;
+bool CRawInput::GCP = false;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
@@ -170,11 +171,15 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 	CRawInput::set_x = (long)x;
 	CRawInput::set_y = (long)y;
 
+	if ((CRawInput::set_x == 0) && (CRawInput::set_y == 0))
+		CRawInput::GCP = true;
+
 	++CRawInput::SCP;
 	CRawInput::set_x -= CRawInput::x;
 	CRawInput::set_y -= CRawInput::y;
 	if (CRawInput::SCP == 2)
 	{
+		CRawInput::GCP = false;
 		CRawInput::SCP = 0;
 		CRawInput::set_x += CRawInput::x;
 		CRawInput::set_y += CRawInput::y;
@@ -196,17 +201,17 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	// Split off raw input handling to accumulate independently
 	CRawInput::set_x += CRawInput::x;
 	CRawInput::set_y += CRawInput::y;
-	if ((CRawInput::set_x == 0) && (CRawInput::set_y == 0))
+
+	if (!CRawInput::GCP)
 	{
-		if ((CRawInput::x == 0) && (CRawInput::y == 0))
-		{
-			lpPoint->x = CRawInput::hold_x;
-			lpPoint->y = CRawInput::hold_y;
-			return 0;
-		}
+		lpPoint->x = CRawInput::set_x;
+		lpPoint->y = CRawInput::set_y;
 	}
-	lpPoint->x = CRawInput::set_x;
-	lpPoint->y = CRawInput::set_y;
+	else
+	{
+		lpPoint->x = CRawInput::hold_x;
+		lpPoint->y = CRawInput::hold_y;
+	}
 
 	// Raw input accumulation resets moved here from hSetCursorPos
 	CRawInput::x = 0;

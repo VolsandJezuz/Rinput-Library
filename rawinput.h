@@ -52,6 +52,7 @@ private:
 	static long hold_x;
 	static long hold_y;
 	static int SCP;
+	static bool GCP;
 
 	static HWND hwndInput;
 	static bool bRegistered;
