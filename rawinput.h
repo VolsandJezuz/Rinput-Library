@@ -56,10 +56,6 @@ private:
 	static int SCP;
 	static bool GCP;
 	static bool sourceEXE;
-	static LARGE_INTEGER freq;
-	static LARGE_INTEGER old;
-	static LARGE_INTEGER older;
-	static double avg;
 
 	static HWND hwndInput;
 	static bool bRegistered;
