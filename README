@@ -1,6 +1,6 @@
-RInput Library v1.35 by Vols and Jezuz
+RInput Library v1.36 by Vols and Jezuz
 --------------------------------------
-RInput allows you to override low definition windows mouse input (accurate untill 400cpi) with high definition mouse input (raw input, which is more accurate for high cpi mice). This is certainly useful for older games as those engines only support low definition windows mouse input.
+RInput is an alternative to in-game raw input, which some users perceive as having input lag or other shortcomings. It also allows for raw input in games which do not have a native raw input implementation. In either case, RInput will only work for games that control aim using the Win32 API functions GetCursorPos and SetCursorPos.
 
 Requirements:
 --------------------------------------
@@ -23,7 +23,7 @@ Compiled with Visual Studio 2008, though you may be able to get it to work with 
 - Add the Microsoft SDK (I used v6.0A that came with VS2008/VC++2008) folders as additional Include directory and additional linker library directory
 - Compiled with Multi-threaded DLL runtime library for linking
 - Set the Entry Point as DllMain
-- Use x86 architecture for compiling (i.e., RInput does not support for x64 applications)
+- Use x86 architecture for compiling (i.e., RInput does not support x64 applications)
 - MS Detours 1.5 header and library were acquired from http://home.comcast.net/~wiccaan/downloads/Detours.rar
 
 How it works:
