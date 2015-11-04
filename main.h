@@ -5,6 +5,7 @@
 #define WIN32_LEAN_AND_MEAN
 
 #define WINVER 0x0501			// XP atleast
+#define _WIN32_WINDOWS 0x0501	// XP atleast
 #define _WIN32_WINNT 0x0501		// XP atleast
 
 #define ERROR_BUFFER_SIZE 256	// amount of bytes to store an error string

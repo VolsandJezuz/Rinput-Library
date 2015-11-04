@@ -31,7 +31,6 @@ public:
 	// Hooked functions handling
 	static int __stdcall hGetCursorPos(LPPOINT lpPoint);
 	static int __stdcall hSetCursorPos(int x, int y);
-	static int __stdcall hQueryPerformanceCounter(LARGE_INTEGER *lpPerformanceCount);
 
 	// Poll Input
 	static unsigned int pollInput();
