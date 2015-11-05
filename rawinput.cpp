@@ -47,6 +47,7 @@ long CRawInput::hold_y = 0;
 int CRawInput::SCP = 0;
 bool CRawInput::GCP = false;
 bool CRawInput::sourceEXE = false;
+int CRawInput::consecG = 0;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
@@ -95,8 +96,9 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 
 bool CRawInput::initInput(WCHAR* pwszError)
 {
-	// Set default coordinates
-	CRawInput::x = CRawInput::y = CRawInput::set_x = CRawInput::set_y = 0;
+	// Set screen center until SetCursorPos is called
+	CRawInput::hold_x = GetSystemMetrics(SM_CXSCREEN) >> 1;
+	CRawInput::hold_y = GetSystemMetrics(SM_CYSCREEN) >> 1;
 
 	// Get process and enable bug fixes for source games
 	char szEXEPath[MAX_PATH];
@@ -181,13 +183,15 @@ LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPA
 
 int __stdcall CRawInput::hSetCursorPos(int x, int y)
 {
-	if (!TrmpSetCursorPos(x, y)) return 1;
+	// Skips unnecessary second SetCursorPos call for source games
+	if (!CRawInput::SCP && !TrmpSetCursorPos(x, y)) return 1;
 
 	CRawInput::set_x = (long)x;
 	CRawInput::set_y = (long)y;
 
 	if (CRawInput::sourceEXE)
 	{
+		CRawInput::consecG = 0;
 		// Alt-tab bug fix
 		if ((CRawInput::set_x == 0) && (CRawInput::set_y == 0))
 			CRawInput::GCP = true;
@@ -221,6 +225,21 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	CRawInput::set_y += CRawInput::y;
 
 	CRawInput::SCP = 0;
+	// Bug fix for cursor hitting side of screen in TF2 backpack
+	if (CRawInput::consecG < 2)
+		++CRawInput::consecG;
+	if (CRawInput::sourceEXE && (CRawInput::consecG == 2))
+	{
+		if (CRawInput::set_x >= CRawInput::hold_x << 1)
+			CRawInput::set_x = (CRawInput::hold_x << 1) - 1;
+		else if (CRawInput::set_x < 0)
+			CRawInput::set_x = 0;
+		if (CRawInput::set_y >= CRawInput::hold_y << 1)
+			CRawInput::set_y = (CRawInput::hold_y << 1) - 1;
+		else if (CRawInput::set_y < 0)
+			CRawInput::set_y = 0;
+	}
+
 	// Alt-tab bug fix
 	if (!CRawInput::GCP)
 	{

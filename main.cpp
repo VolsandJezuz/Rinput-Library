@@ -94,7 +94,7 @@ extern "C" __declspec(dllexport) void entryPoint()
 #endif
 }
 
-// Validate that we are working with Windows XP or higher (required for raw input)
+// Validate that we are working with at least Windows XP
 inline bool validateVersion()
 {
 	DWORD dwVersion = GetVersion();

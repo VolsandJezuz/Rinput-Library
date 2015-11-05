@@ -25,24 +25,24 @@ public:
 	// Initialize raw input
 	static bool initialize(WCHAR* pwszError);
 
-	// Enable/Disable the hooking
+	// Enables or disables the hooking
 	static bool hookLibrary(bool bInstall);
 
 	// Hooked functions handling
 	static int __stdcall hGetCursorPos(LPPOINT lpPoint);
 	static int __stdcall hSetCursorPos(int x, int y);
 
-	// Poll Input
+	// Poll input
 	static unsigned int pollInput();
 
-	// Input Window Proc
+	// Input window proc
 	static LRESULT __stdcall wpInput(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 	// Initialization
 	static bool initWindow(WCHAR* pwszError);
 	static bool initInput(WCHAR* pwszError);
 
-	// Unload Raw Input
+	// Unload raw input
 	static void unload();
 
 private:
@@ -55,6 +55,7 @@ private:
 	static int SCP;
 	static bool GCP;
 	static bool sourceEXE;
+	static int consecG;
 
 	static HWND hwndInput;
 	static bool bRegistered;
