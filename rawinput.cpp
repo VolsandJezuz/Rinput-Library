@@ -103,8 +103,8 @@ bool CRawInput::initInput(WCHAR* pwszError)
 	// Get process and enable bug fixes for source games
 	char szEXEPath[MAX_PATH];
 	char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", "left4dead.exe", "left4dead2.exe", "dota2.exe", "insurgency.exe", "p3.exe", "bms.exe", NULL};
-	GetModuleFileName(NULL, szEXEPath, sizeof(szEXEPath));
-	PathStripPath(szEXEPath);
+	GetModuleFileNameA(NULL, szEXEPath, sizeof(szEXEPath));
+	PathStripPathA(szEXEPath);
 	for (char **iSource_exes = source_exes; *iSource_exes != NULL; ++iSource_exes)
 	{
 		if ((std::string)szEXEPath == (std::string)*iSource_exes)
