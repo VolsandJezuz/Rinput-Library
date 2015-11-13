@@ -56,6 +56,7 @@ private:
 	static bool GCP;
 	static bool sourceEXE;
 	static int consecG;
+	static int n_sourceEXE;
 
 	static HWND hwndInput;
 	static bool bRegistered;

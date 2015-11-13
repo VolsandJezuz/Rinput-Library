@@ -48,6 +48,7 @@ int CRawInput::SCP = 0;
 bool CRawInput::GCP = false;
 bool CRawInput::sourceEXE = false;
 int CRawInput::consecG = 0;
+int CRawInput::n_sourceEXE = 0;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
@@ -96,17 +97,31 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 
 bool CRawInput::initInput(WCHAR* pwszError)
 {
-	// Set screen center until SetCursorPos is called
-	CRawInput::hold_x = GetSystemMetrics(SM_CXSCREEN) >> 1;
-	CRawInput::hold_y = GetSystemMetrics(SM_CYSCREEN) >> 1;
+	// Now behaves correctly with windowed mode
+	HWND client_hwnd = GetForegroundWindow();
+	RECT client_rect;
+	if(GetClientRect(client_hwnd, &client_rect))
+	{
+	  long clientx = client_rect.right >> 1;
+	  long clienty = client_rect.bottom >> 1;
+	  LPPOINT client_lpPoint = new tagPOINT;
+	  client_lpPoint->x = clientx;
+	  client_lpPoint->y = clienty;
+	  ClientToScreen(client_hwnd, client_lpPoint);
+	  // Set screen center until SetCursorPos is called
+	  CRawInput::hold_x = client_lpPoint->x;
+	  CRawInput::hold_y = client_lpPoint->y;
+	}
 
 	// Get process and enable bug fixes for source games
 	char szEXEPath[MAX_PATH];
-	char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", "left4dead.exe", "left4dead2.exe", "dota2.exe", "insurgency.exe", "p3.exe", "bms.exe", NULL};
+	// Bug fixes now limited to source games that have been tested
+	char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
 	GetModuleFileNameA(NULL, szEXEPath, sizeof(szEXEPath));
 	PathStripPathA(szEXEPath);
 	for (char **iSource_exes = source_exes; *iSource_exes != NULL; ++iSource_exes)
 	{
+		++CRawInput::n_sourceEXE;
 		if ((std::string)szEXEPath == (std::string)*iSource_exes)
 		{
 			CRawInput::sourceEXE = true;
@@ -228,7 +243,8 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	// Bug fix for cursor hitting side of screen in TF2 backpack
 	if (CRawInput::consecG < 2)
 		++CRawInput::consecG;
-	if (CRawInput::sourceEXE && (CRawInput::consecG == 2))
+	// Changed to be active for hl2.exe only, the exe that TF2 uses
+	if ((CRawInput::n_sourceEXE == 2) && (CRawInput::consecG == 2))
 	{
 		if (CRawInput::set_x >= CRawInput::hold_x << 1)
 			CRawInput::set_x = (CRawInput::hold_x << 1) - 1;

@@ -1,4 +1,4 @@
-# RInput Library v1.37 by Vols and Jezuz
+# RInput Library v1.38 by Vols and Jezuz
 RInput is an alternative to in-game raw input, which some users perceive as having input lag or other shortcomings. It also allows for raw input in games which do not have a native raw input implementation. In either case, RInput will only work for games that control aim using the Win32 API functions GetCursorPos and SetCursorPos.
 
 ## Requirements
@@ -13,12 +13,15 @@ This is a fork of RInput Library v1.31 as originally authored by abort. x64 arch
 - This library obviously has to get recompiled to 64-bit (might require some changes to Win32 API calls for the RInput HWND)
 
 ## Building
-Compiled with Visual Studio 2008, though you may be able to get it to work with other versions or compilers (Visual C++ 2008 Express Edition is available for free @ https://go.microsoft.com/?linkid=7729279);
+Compiled with Visual Studio 2008, though you may be able to get it to work with other versions or compilers (Visual C++ 2008 Express Edition is available for free @ https://go.microsoft.com/?linkid=7729279). If you want to start from scratch with your own project file, here's what seem to be the most important compiler and project options:
 - Pick Dynamic Library (.dll) as the configuration type
 - Compile using Multi-Byte Character Set
 - Add the Microsoft SDK (I used v6.0A that came with VS2008/VC++2008) folders as additional Include directory and additional linker library directory
 - Compiled with Multi-threaded DLL runtime library for linking
+- It may be necessary to set Enable C++ Exceptions to Yes (/EHsc), as it didn't seem to want to compile properly in set to No
+- Set Calling Convention __cdecl (/Gd), as it seems to be the only one that performs well
 - Set the Entry Point as DllMain
+- Add shlwapi.lib as an Additional Dependency in the Linker options
 - Use x86 architecture for compiling (i.e., RInput does not support x64 applications)
 - MS Detours 1.5 header and library were acquired from http://home.comcast.net/~wiccaan/downloads/Detours.rar
 
