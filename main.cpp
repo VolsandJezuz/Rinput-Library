@@ -3,11 +3,11 @@
 	Jezuz (http://steamcommunity.com/profiles/76561198057348857/), with
 	a lot of help from BuSheeZy (http://BushGaming.com) and qsxcv
 	(http://www.overclock.net/u/395745/qsxcv).
-	
+
 	------------------------------------------------------------------
 	Comments from original author, abort (http://blog.digitalise.net/)
 	------------------------------------------------------------------
-	
+
 	RInput allows you to override low definition windows mouse input
 	with high definition mouse input.
 
@@ -15,18 +15,18 @@
 
 	This file is part of RInput.
 
-    RInput is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+	RInput is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
 
-    RInput is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	RInput is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with RInput.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with RInput.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "main.h"
