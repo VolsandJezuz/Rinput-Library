@@ -30,6 +30,11 @@
 */
 
 #include "main.h"
+#include <shlwapi.h>
+
+bool bCaptureThreadStop = false;
+HANDLE hCaptureThread = NULL;
+extern HANDLE dummyEvent;
 
 int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 {
@@ -47,9 +52,24 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 #endif
 
 			break;
+
 		case DLL_PROCESS_DETACH:
-				CRawInput::hookLibrary(false);
-				CRawInput::unload();
+			// Stop D3D hooking for CS:GO
+			if (n_sourceEXE == 1)
+			{
+				bCaptureThreadStop = true;
+				WaitForSingleObject(hCaptureThread, 300);
+
+				if (dummyEvent)
+					CloseHandle(dummyEvent);
+
+				if (hwndSender)
+					DestroyWindow(hwndSender);
+			}
+
+			CRawInput::hookLibrary(false);
+			CRawInput::unload();
+
 #ifdef _DEBUG
 			OutputDebugString("Unloaded RInput");
 #endif
@@ -76,6 +96,35 @@ extern "C" __declspec(dllexport) void entryPoint()
 
 	if (!CRawInput::initialize(pwszError))
 		displayError(pwszError);
+	else
+	{
+		// Get process and enable bug fixes for source games
+		char szEXEPath[MAX_PATH];
+		// Bug fixes now limited to source games that have been tested
+		char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
+		GetModuleFileNameA(NULL, szEXEPath, sizeof(szEXEPath));
+		PathStripPathA(szEXEPath);
+		for (char **iSource_exes = source_exes; *iSource_exes != NULL; ++iSource_exes)
+		{
+			++n_sourceEXE;
+			if ((std::string)szEXEPath == (std::string)*iSource_exes)
+			{
+				// Start D3D hooking for CS:GO
+				if (n_sourceEXE == 1)
+				{
+					HANDLE hThread = NULL;
+					HANDLE hEntryPointThread = OpenThread(THREAD_ALL_ACCESS, NULL, GetCurrentThreadId());
+					if (!(hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, (LPVOID)hEntryPointThread, 0, 0)))
+						CloseHandle(hEntryPointThread);
+					else
+						hCaptureThread = hThread;
+				}
+
+				sourceEXE = true;
+				break;
+			}
+		}
+	}
 
 	if (!CRawInput::hookLibrary(true))
 		displayError(L"Failed to hook Windows API cursor functions.");

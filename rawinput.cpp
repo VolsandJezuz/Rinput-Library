@@ -31,6 +31,8 @@
 
 #include "rawinput.h"
 
+#pragma intrinsic(memset)
+
 // Define the to be hooked functions
 extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpGetCursorPos(LPPOINT lpPoint), GetCursorPos);
 extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpSetCursorPos(int x, int y), SetCursorPos);
@@ -46,9 +48,11 @@ long CRawInput::hold_x = 0;
 long CRawInput::hold_y = 0;
 int CRawInput::SCP = 0;
 bool CRawInput::GCP = false;
-bool CRawInput::sourceEXE = false;
 int CRawInput::consecG = 0;
-int CRawInput::n_sourceEXE = 0;
+
+extern int n_sourceEXE;
+extern bool sourceEXE;
+extern int consec_endscene;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
@@ -111,22 +115,6 @@ bool CRawInput::initInput(WCHAR* pwszError)
 		// Set screen center until SetCursorPos is called
 		CRawInput::hold_x = client_lpPoint->x;
 		CRawInput::hold_y = client_lpPoint->y;
-	}
-
-	// Get process and enable bug fixes for source games
-	char szEXEPath[MAX_PATH];
-	// Bug fixes now limited to source games that have been tested
-	char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
-	GetModuleFileNameA(NULL, szEXEPath, sizeof(szEXEPath));
-	PathStripPathA(szEXEPath);
-	for (char **iSource_exes = source_exes; *iSource_exes != NULL; ++iSource_exes)
-	{
-		++CRawInput::n_sourceEXE;
-		if ((std::string)szEXEPath == (std::string)*iSource_exes)
-		{
-			CRawInput::sourceEXE = true;
-			break;
-		}
 	}
 
 	// Raw input accumulators initialized to starting cursor position
@@ -204,7 +192,7 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 	CRawInput::set_x = (long)x;
 	CRawInput::set_y = (long)y;
 
-	if (CRawInput::sourceEXE)
+	if (sourceEXE)
 	{
 		CRawInput::consecG = 0;
 		// Alt-tab bug fix
@@ -219,6 +207,7 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 		}
 		else if (CRawInput::SCP == 2)
 		{
+			consec_endscene = 0;
 			CRawInput::GCP = false;
 			CRawInput::SCP = 0;
 			CRawInput::hold_x = CRawInput::set_x;
@@ -244,7 +233,7 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	if (CRawInput::consecG < 2)
 		++CRawInput::consecG;
 	// Changed to be active for hl2.exe only, the exe that TF2 uses
-	if ((CRawInput::n_sourceEXE == 2) && (CRawInput::consecG == 2))
+	if ((n_sourceEXE == 2) && (CRawInput::consecG == 2))
 	{
 		if (CRawInput::set_x >= CRawInput::hold_x << 1)
 			CRawInput::set_x = (CRawInput::hold_x << 1) - 1;
@@ -259,6 +248,24 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	// Alt-tab bug fix
 	if (!CRawInput::GCP)
 	{
+		// Buy and escape menu bug fix
+		if (consec_endscene == 5)
+		{
+			// Respects changes in resolution
+			HWND new_hwnd = GetForegroundWindow();
+			RECT new_rect;
+			if(GetClientRect(new_hwnd, &new_rect))
+			{
+			  long newx = new_rect.right >> 1;
+			  long newy = new_rect.bottom >> 1;
+			  LPPOINT new_lpPoint = new tagPOINT;
+			  new_lpPoint->x = newx;
+			  new_lpPoint->y = newy;
+			  ClientToScreen(new_hwnd, new_lpPoint);
+			  CRawInput::set_x = new_lpPoint->x;
+			  CRawInput::set_y = new_lpPoint->y;
+			}
+		}
 		lpPoint->x = CRawInput::set_x;
 		lpPoint->y = CRawInput::set_y;
 	}

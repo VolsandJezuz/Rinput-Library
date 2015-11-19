@@ -2,8 +2,6 @@
 #define RAWINPUT_H_
 
 #include <windows.h>
-#include <string>
-#include <shlwapi.h>
 #include "detours.h" // Required for function hooking
 
 #define RAWINPUTHDRSIZE sizeof(RAWINPUTHEADER)
@@ -54,9 +52,7 @@ private:
 	static long hold_y;
 	static int SCP;
 	static bool GCP;
-	static bool sourceEXE;
 	static int consecG;
-	static int n_sourceEXE;
 
 	static HWND hwndInput;
 	static bool bRegistered;
