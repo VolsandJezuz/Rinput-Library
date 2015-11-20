@@ -256,14 +256,14 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 			RECT new_rect;
 			if(GetClientRect(new_hwnd, &new_rect))
 			{
-			  long newx = new_rect.right >> 1;
-			  long newy = new_rect.bottom >> 1;
-			  LPPOINT new_lpPoint = new tagPOINT;
-			  new_lpPoint->x = newx;
-			  new_lpPoint->y = newy;
-			  ClientToScreen(new_hwnd, new_lpPoint);
-			  CRawInput::set_x = new_lpPoint->x;
-			  CRawInput::set_y = new_lpPoint->y;
+				long newx = new_rect.right >> 1;
+				long newy = new_rect.bottom >> 1;
+				LPPOINT new_lpPoint = new tagPOINT;
+				new_lpPoint->x = newx;
+				new_lpPoint->y = newy;
+				ClientToScreen(new_hwnd, new_lpPoint);
+				CRawInput::set_x = new_lpPoint->x;
+				CRawInput::set_y = new_lpPoint->y;
 			}
 		}
 		lpPoint->x = CRawInput::set_x;

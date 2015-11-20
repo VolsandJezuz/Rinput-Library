@@ -28,39 +28,39 @@ typedef HRESULT(STDMETHODCALLTYPE *D3D9EndScenePROC)(IDirect3DDevice9 *device);
 
 HRESULT STDMETHODCALLTYPE D3D9EndScene(IDirect3DDevice9 *device)
 {
-    EnterCriticalSection(&d3d9EndMutex);
+	EnterCriticalSection(&d3d9EndMutex);
 
-    d3d9EndScene.Unhook();
+	d3d9EndScene.Unhook();
 
-    if(lpCurrentDevice == NULL)
-    {
-        IDirect3D9 *d3d;
-        if(SUCCEEDED(device->GetDirect3D(&d3d)))
-        {
-            IDirect3D9 *d3d9ex;
-            if(bD3D9Ex = SUCCEEDED(d3d->QueryInterface(__uuidof(IDirect3D9Ex), (void**)&d3d9ex)))
-                d3d9ex->Release();
-            d3d->Release();
-        }
+	if(lpCurrentDevice == NULL)
+	{
+		IDirect3D9 *d3d;
+		if(SUCCEEDED(device->GetDirect3D(&d3d)))
+		{
+			IDirect3D9 *d3d9ex;
+			if(bD3D9Ex = SUCCEEDED(d3d->QueryInterface(__uuidof(IDirect3D9Ex), (void**)&d3d9ex)))
+				d3d9ex->Release();
+			d3d->Release();
+		}
 
-        if(!bTargetAcquired)
-        {
-            lpCurrentDevice = device;
-            SetupD3D9(device);
-            bTargetAcquired = true;
-        }
-    }
+		if(!bTargetAcquired)
+		{
+			lpCurrentDevice = device;
+			SetupD3D9(device);
+			bTargetAcquired = true;
+		}
+	}
 
 	// EndScene is called twice per frame render
 	if (consec_endscene < 5)
 		++consec_endscene;
 
-    HRESULT hRes = device->EndScene();
-    d3d9EndScene.Rehook();
+	HRESULT hRes = device->EndScene();
+	d3d9EndScene.Rehook();
 
-    LeaveCriticalSection(&d3d9EndMutex);
+	LeaveCriticalSection(&d3d9EndMutex);
 
-    return hRes;
+	return hRes;
 }
 
 void LogPresentParams(D3DPRESENT_PARAMETERS &pp);
@@ -87,8 +87,8 @@ bool InitD3D9Capture()
 	wchar_t lpD3D9Path[MAX_PATH];
 	SHGetFolderPathW(NULL, CSIDL_SYSTEM, NULL, SHGFP_TYPE_CURRENT, lpD3D9Path);
 	size_t size = 11;
-    wchar_t* wa = new wchar_t[size];
-    mbstowcs_s(&size, wa, 11, TEXT("\\d3d9.dll"), 11);
+	wchar_t* wa = new wchar_t[size];
+	mbstowcs_s(&size, wa, 11, TEXT("\\d3d9.dll"), 11);
 	wcscat_s(lpD3D9Path, MAX_PATH, wa);
 
 	hD3D9Dll = GetModuleHandleW(lpD3D9Path);

@@ -14,7 +14,6 @@
 HWND hwndSender = NULL;
 bool bTargetAcquired = false;
 extern bool bCaptureThreadStop;
-extern HANDLE hCaptureThread;
 CRITICAL_SECTION d3d9EndMutex;
 void CheckD3D9Capture();
 bool bD3D9Hooked = false;
@@ -42,16 +41,6 @@ inline bool AttemptToHookSomething()
 
 #define SENDER_WINDOWCLASS TEXT("RInputD3DSender")
 
-#define TIMER_ID 431879
-BOOL GetMessageTimeout(MSG &msg, DWORD timeout)
-{
-    BOOL ret;
-    SetTimer(NULL, TIMER_ID, timeout, NULL);
-    ret = GetMessage(&msg, NULL, 0, 0);
-    KillTimer(NULL, TIMER_ID);
-    return ret;
-}
-
 static inline HWND CreateDummyWindow(LPCTSTR lpClass, LPCTSTR lpName)
 {
 	return CreateWindowEx (0, lpClass, lpName, WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 0, 0, 1, 1, NULL, NULL, g_hInstance, NULL);
@@ -71,9 +60,9 @@ static DWORD WINAPI DummyWindowThread(LPVOID lpBla)
 		hwndSender = CreateDummyWindow(SENDER_WINDOWCLASS, NULL);
 		if (!hwndSender)
 			return 0;
-		else
-			return 0;
 	}
+	else
+		return 0;
 
 	MSG msg;
 	while (GetMessage(&msg, NULL, 0, 0))
@@ -85,14 +74,14 @@ static DWORD WINAPI DummyWindowThread(LPVOID lpBla)
 	return 0;
 }
 
-DWORD WINAPI CaptureThread(HANDLE hEntryPointThread)
+DWORD WINAPI CaptureThread(HANDLE hDllMainThread)
 {
 	bool bSuccess = false;
 
-	if (hEntryPointThread)
+	if (hDllMainThread)
 	{
-		WaitForSingleObject(hEntryPointThread, 150);
-		CloseHandle(hEntryPointThread);
+		WaitForSingleObject(hDllMainThread, 150);
+		CloseHandle(hDllMainThread);
 	}
 
 	dummyEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
@@ -120,30 +109,4 @@ DWORD WINAPI CaptureThread(HANDLE hEntryPointThread)
 	}
 
 	return 0;
-}
-
-static bool hooking = true;
-
-typedef BOOL (WINAPI *UHWHEXPROC)(HHOOK);
-
-extern "C" __declspec(dllexport) LRESULT CALLBACK DummyDebugProc(int code, WPARAM wParam, LPARAM lParam)
-{
-	MSG *msg = (MSG*)lParam;
-
-	if (hooking && msg->message == (WM_USER + 432))
-	{
-		char uhwhexStr[20];
-		HMODULE hU32 = GetModuleHandleW(L"USER32");
-
-		memcpy(uhwhexStr, "PjoinkTkch`yz@de~Qo", 20);
-
-		for (int i = 0; i < 19; i++) uhwhexStr[i] ^= i ^ 5;
-
-		UHWHEXPROC unhookWindowsHookEx = (UHWHEXPROC)GetProcAddress(hU32, uhwhexStr);
-		if (unhookWindowsHookEx)	   
-			unhookWindowsHookEx((HHOOK)msg->lParam);
-		hooking = false;
-	}
-
-	return CallNextHookEx(0, code, wParam, lParam);
 }
