@@ -152,5 +152,5 @@ extern HWND hwndSender;
 extern bool bTargetAcquired;
 extern bool bCaptureThreadStop;
 extern bool bD3D9Hooked;
-DWORD WINAPI CaptureThread(HANDLE hEntryPointThread);
+DWORD WINAPI CaptureThread(HANDLE hDllMainThread);
 bool InitD3D9Capture();

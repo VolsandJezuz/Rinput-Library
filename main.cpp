@@ -63,9 +63,12 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 							HANDLE hThread = NULL;
 							HANDLE hDllMainThread = OpenThread(THREAD_ALL_ACCESS, NULL, GetCurrentThreadId());
 							if (!(hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, (LPVOID)hDllMainThread, 0, 0)))
+							{
 								CloseHandle(hDllMainThread);
-							else
-								hCaptureThread = hThread;
+								return 0;
+							}
+							hCaptureThread = hThread;
+							CloseHandle(hThread);
 						}
 
 						sourceEXE = true;
@@ -90,9 +93,10 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 
 				if (dummyEvent)
 					CloseHandle(dummyEvent);
-
 				if (hwndSender)
 					DestroyWindow(hwndSender);
+				if (hCaptureThread)
+					CloseHandle(hCaptureThread);
 			}
 
 			CRawInput::hookLibrary(false);

@@ -201,10 +201,11 @@ void SetupD3D9(IDirect3DDevice9 *device)
 		d3d9Present.Rehook();
 		d3d9SwapPresent.Rehook();
 		d3d9Reset.Rehook();
-        if(bD3D9Ex) {
-            d3d9PresentEx.Rehook();
-            d3d9ResetEx.Rehook();
-        }
+		if(bD3D9Ex)
+		{
+			d3d9PresentEx.Rehook();
+			d3d9ResetEx.Rehook();
+		}
 
 		swapChain->Release();
 	}
@@ -258,7 +259,6 @@ bool InitD3D9Capture()
 
 					d3d9EndScene.Rehook();
 				}
-				
 				d3d9ex->Release();
 			}
 		}
