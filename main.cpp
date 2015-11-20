@@ -45,7 +45,6 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 		case DLL_PROCESS_ATTACH:
 			// No need for a threaded entry
 			if (!DisableThreadLibraryCalls(hInstance)) return 0;
-			else
 			{
 				// Get process and enable bug fixes for source games
 				char szEXEPath[MAX_PATH];

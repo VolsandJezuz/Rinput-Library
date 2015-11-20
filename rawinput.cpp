@@ -108,20 +108,20 @@ bool CRawInput::initInput(WCHAR* pwszError)
 	{
 		long clientx = client_rect.right >> 1;
 		long clienty = client_rect.bottom >> 1;
-		LPPOINT client_lpPoint = new tagPOINT;
-		client_lpPoint->x = clientx;
-		client_lpPoint->y = clienty;
-		ClientToScreen(client_hwnd, client_lpPoint);
+		POINT client_point;
+		client_point.x = clientx;
+		client_point.y = clienty;
+		ClientToScreen(client_hwnd, &client_point);
 		// Set screen center until SetCursorPos is called
-		CRawInput::hold_x = client_lpPoint->x;
-		CRawInput::hold_y = client_lpPoint->y;
+		CRawInput::hold_x = client_point.x;
+		CRawInput::hold_y = client_point.y;
 	}
 
 	// Raw input accumulators initialized to starting cursor position
-	LPPOINT defCor = new tagPOINT;
-	GetCursorPos(defCor);
-	CRawInput::set_x = defCor->x;
-	CRawInput::set_y = defCor->y;
+	POINT defCor;
+	GetCursorPos(&defCor);
+	CRawInput::set_x = defCor.x;
+	CRawInput::set_y = defCor.y;
 
 	RAWINPUTDEVICE rMouse;
 	memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
@@ -258,12 +258,12 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 			{
 				long newx = new_rect.right >> 1;
 				long newy = new_rect.bottom >> 1;
-				LPPOINT new_lpPoint = new tagPOINT;
-				new_lpPoint->x = newx;
-				new_lpPoint->y = newy;
-				ClientToScreen(new_hwnd, new_lpPoint);
-				CRawInput::set_x = new_lpPoint->x;
-				CRawInput::set_y = new_lpPoint->y;
+				POINT new_Point;
+				new_Point.x = newx;
+				new_Point.y = newy;
+				ClientToScreen(new_hwnd, &new_Point);
+				CRawInput::set_x = new_Point.x;
+				CRawInput::set_y = new_Point.y;
 			}
 		}
 		lpPoint->x = CRawInput::set_x;

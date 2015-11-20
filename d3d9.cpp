@@ -223,6 +223,7 @@ bool InitD3D9Capture()
 	wchar_t* wa = new wchar_t[size];
 	mbstowcs_s(&size, wa, 11, TEXT("\\d3d9.dll"), 11);
 	wcscat_s(lpD3D9Path, MAX_PATH, wa);
+	delete[] wa;
 
 	hD3D9Dll = GetModuleHandleW(lpD3D9Path);
 	if (hD3D9Dll)
