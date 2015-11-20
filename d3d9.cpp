@@ -11,10 +11,21 @@
 #include "hook.h"
 #include <d3d9.h>
 
-// EndScene is hooked to detect frame renders
-HookData d3d9EndScene;
+// Prevent empty controlled statement warning, as it's intentional
+#pragma warning(disable: 4390)
 
-extern int consec_endscene;
+typedef HRESULT (WINAPI *PRESENTPROC)(IDirect3DDevice9*, const RECT*, const RECT*, HWND, const RGNDATA*);
+typedef HRESULT (WINAPI *PRESENTEXPROC)(IDirect3DDevice9*, const RECT*, const RECT*, HWND, const RGNDATA*, DWORD);
+typedef HRESULT (WINAPI *SWAPPRESENTPROC)(IDirect3DSwapChain9*, const RECT*, const RECT*, HWND, const RGNDATA*, DWORD);
+
+HookData d3d9EndScene;
+HookData d3d9Reset;
+HookData d3d9ResetEx;
+HookData d3d9Present;
+HookData d3d9PresentEx;
+HookData d3d9SwapPresent;
+
+extern int frame_rendered;
 extern CRITICAL_SECTION d3d9EndMutex;
 extern bool bD3D9Hooked;
 
@@ -23,6 +34,8 @@ BOOL bD3D9Ex = FALSE;
 HMODULE hD3D9Dll = NULL;
 
 void SetupD3D9(IDirect3DDevice9 *device);
+
+static int presentRecurse = 0;
 
 typedef HRESULT(STDMETHODCALLTYPE *D3D9EndScenePROC)(IDirect3DDevice9 *device);
 
@@ -51,10 +64,6 @@ HRESULT STDMETHODCALLTYPE D3D9EndScene(IDirect3DDevice9 *device)
 		}
 	}
 
-	// EndScene is called twice per frame render
-	if (consec_endscene < 5)
-		++consec_endscene;
-
 	HRESULT hRes = device->EndScene();
 	d3d9EndScene.Rehook();
 
@@ -63,17 +72,141 @@ HRESULT STDMETHODCALLTYPE D3D9EndScene(IDirect3DDevice9 *device)
 	return hRes;
 }
 
-void LogPresentParams(D3DPRESENT_PARAMETERS &pp);
+HRESULT STDMETHODCALLTYPE D3D9Present(IDirect3DDevice9 *device, CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion)
+{
+	d3d9Present.Unhook();
+
+	if (!presentRecurse)
+	{
+		if (frame_rendered < 3)
+			++frame_rendered;
+	}
+	presentRecurse++;
+	HRESULT hRes = device->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
+	presentRecurse--;
+	
+	d3d9Present.Rehook();
+	
+	return hRes;
+}
+
+HRESULT STDMETHODCALLTYPE D3D9PresentEx(IDirect3DDevice9Ex *device, CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion, DWORD dwFlags)
+{
+	d3d9PresentEx.Unhook();
+
+	if (!presentRecurse)
+	{
+		if (frame_rendered < 3)
+			++frame_rendered;
+	}
+	presentRecurse++;
+	HRESULT hRes = device->PresentEx(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
+	presentRecurse--;
+
+	d3d9PresentEx.Rehook();
+
+	return hRes;
+}
+
+HRESULT STDMETHODCALLTYPE D3D9SwapPresent(IDirect3DSwapChain9 *swap, CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion, DWORD dwFlags)
+{
+	d3d9SwapPresent.Unhook();
+
+	if(!presentRecurse)
+	{
+		if (frame_rendered < 3)
+			++frame_rendered;
+	}
+	presentRecurse++;
+	HRESULT hRes = swap->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
+	presentRecurse--;
+
+	d3d9SwapPresent.Rehook();
+
+	return hRes;
+}
+
+typedef HRESULT(STDMETHODCALLTYPE *D3D9ResetPROC)(IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *params);
+
+HRESULT STDMETHODCALLTYPE D3D9Reset(IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *params)
+{
+	d3d9Reset.Unhook();
+
+	HRESULT hRes = device->Reset(params);
+
+	if(lpCurrentDevice == NULL && !bTargetAcquired)
+	{
+		lpCurrentDevice = device;
+		bTargetAcquired = true;
+	}
+
+	if(lpCurrentDevice == device)
+		SetupD3D9(device);
+
+	d3d9Reset.Rehook();
+
+	return hRes;
+}
+
+HRESULT STDMETHODCALLTYPE D3D9ResetEx(IDirect3DDevice9Ex *device, D3DPRESENT_PARAMETERS *params, D3DDISPLAYMODEEX *fullscreenData)
+{
+	d3d9ResetEx.Unhook();
+	d3d9Reset.Unhook();
+
+	HRESULT hRes = device->ResetEx(params, fullscreenData);
+
+	if(lpCurrentDevice == NULL && !bTargetAcquired)
+	{
+		lpCurrentDevice = device;
+		bTargetAcquired = true;
+		bD3D9Ex = true;
+	}
+
+	if(lpCurrentDevice == device)
+		SetupD3D9(device);
+
+	d3d9Reset.Rehook();
+	d3d9ResetEx.Rehook();
+
+	return hRes;
+}
 
 void SetupD3D9(IDirect3DDevice9 *device)
 {
-	IDirect3D9 *d3d;
-	if (SUCCEEDED(device->GetDirect3D(&d3d)))
+	IDirect3DSwapChain9 *swapChain = NULL;
+	if (SUCCEEDED(device->GetSwapChain(0, &swapChain)))
 	{
-		IDirect3D9 *d3d9ex;
-		if (bD3D9Ex = SUCCEEDED(d3d->QueryInterface(__uuidof(IDirect3D9Ex), (void**)&d3d9ex)))
-			d3d9ex->Release();
-		d3d->Release();
+		D3DPRESENT_PARAMETERS pp;
+		if (SUCCEEDED(swapChain->GetPresentParameters(&pp)))
+			; //intentionally empty
+
+		IDirect3D9 *d3d;
+		if (SUCCEEDED(device->GetDirect3D(&d3d)))
+		{
+			IDirect3D9 *d3d9ex;
+			if (bD3D9Ex = SUCCEEDED(d3d->QueryInterface(__uuidof(IDirect3D9Ex), (void**)&d3d9ex)))
+				d3d9ex->Release();
+			d3d->Release();
+		}
+
+		d3d9Present.Hook(GetVTable(device, (68/4)), (FARPROC)D3D9Present);
+		if(bD3D9Ex)
+		{
+			FARPROC curPresentEx = GetVTable(device, (484/4));
+			d3d9PresentEx.Hook(curPresentEx, (FARPROC)D3D9PresentEx);
+			d3d9ResetEx.Hook(GetVTable(device, (528/4)), (FARPROC)D3D9ResetEx);
+		}
+		d3d9Reset.Hook(GetVTable(device, (64/4)), (FARPROC)D3D9Reset);
+		d3d9SwapPresent.Hook(GetVTable(swapChain, (12/4)), (FARPROC)D3D9SwapPresent);
+		d3d9Present.Rehook();
+		d3d9SwapPresent.Rehook();
+		d3d9Reset.Rehook();
+        if(bD3D9Ex) {
+            d3d9PresentEx.Rehook();
+            d3d9ResetEx.Rehook();
+        }
+
+		swapChain->Release();
 	}
 }
 

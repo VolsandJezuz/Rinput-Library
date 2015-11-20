@@ -52,7 +52,7 @@ int CRawInput::consecG = 0;
 
 extern int n_sourceEXE;
 extern bool sourceEXE;
-extern int consec_endscene;
+extern int frame_rendered;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
@@ -207,7 +207,7 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 		}
 		else if (CRawInput::SCP == 2)
 		{
-			consec_endscene = 0;
+			frame_rendered = 0;
 			CRawInput::GCP = false;
 			CRawInput::SCP = 0;
 			CRawInput::hold_x = CRawInput::set_x;
@@ -248,10 +248,10 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	// Alt-tab bug fix
 	if (!CRawInput::GCP)
 	{
-		// Buy and escape menu bug fix
-		if (consec_endscene == 5)
+		// Allows 3 frames w/o SetCursorPos to be safe, 2 gives loss
+		if (frame_rendered == 3)
 		{
-			// Respects changes in resolution
+			// Buy and escape menu bug fix--respects resolution changes
 			HWND new_hwnd = GetForegroundWindow();
 			RECT new_rect;
 			if(GetClientRect(new_hwnd, &new_rect))

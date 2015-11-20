@@ -18,7 +18,7 @@
 HINSTANCE g_hInstance = NULL;
 int n_sourceEXE = 0;
 bool sourceEXE = false;
-int consec_endscene = 0;
+int frame_rendered = 0;
 
 // Only handle the hooking and dll functions here
 extern "C" __declspec(dllexport) void entryPoint();
