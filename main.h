@@ -17,7 +17,9 @@
 
 extern "C" __declspec(dllexport) void entryPoint();
 
+HINSTANCE g_hInstance = NULL;
 void displayError(WCHAR* pwszError);
+void unloadLibrary();
 
 inline bool validateVersion();
 

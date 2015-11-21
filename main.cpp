@@ -32,12 +32,10 @@
 #include "main.h"
 #include <shlwapi.h>
 
-HINSTANCE g_hInstance = NULL;
 int n_sourceEXE = 0;
 bool sourceEXE = false;
 HANDLE hCaptureThread = NULL;
 bool bCaptureThreadStop = false;
-static void unloadLibrary();
 
 int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 {
