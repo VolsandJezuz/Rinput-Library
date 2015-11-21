@@ -32,9 +32,12 @@
 #include "main.h"
 #include <shlwapi.h>
 
-bool bCaptureThreadStop = false;
+HINSTANCE g_hInstance = NULL;
+int n_sourceEXE = 0;
+bool sourceEXE = false;
 HANDLE hCaptureThread = NULL;
-extern HANDLE dummyEvent;
+bool bCaptureThreadStop = false;
+static void unloadLibrary();
 
 int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 {
@@ -44,17 +47,21 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 	{
 		case DLL_PROCESS_ATTACH:
 			// No need for a threaded entry
-			if (!DisableThreadLibraryCalls(hInstance)) return 0;
-			{
-				// Get process and enable bug fixes for source games
+			if (!DisableThreadLibraryCalls(hInstance))
+				return 0;
+
+			{ // Get process and enable bug fixes for source games
 				char szEXEPath[MAX_PATH];
-				// Bug fixes now limited to source games that have been tested
-				char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
 				GetModuleFileNameA(NULL, szEXEPath, sizeof(szEXEPath));
 				PathStripPathA(szEXEPath);
+
+				// Bug fixes now limited to source games that have been tested
+				char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
+
 				for (char **iSource_exes = source_exes; *iSource_exes != NULL; ++iSource_exes)
 				{
 					++n_sourceEXE;
+
 					if ((std::string)szEXEPath == (std::string)*iSource_exes)
 					{
 						// Start D3D hooking for CS:GO
@@ -62,39 +69,42 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 						{
 							HANDLE hThread = NULL;
 							HANDLE hDllMainThread = OpenThread(THREAD_ALL_ACCESS, NULL, GetCurrentThreadId());
+
 							if (!(hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, (LPVOID)hDllMainThread, 0, 0)))
 							{
 								CloseHandle(hDllMainThread);
 								return 0;
 							}
+
 							hCaptureThread = hThread;
 							CloseHandle(hThread);
 						}
 
 						sourceEXE = true;
+
 						break;
 					}
 				}
 			}
-			g_hInstance = hInstance;
 
-#ifdef _DEBUG
-			OutputDebugString("Loaded RInput");
-#endif
+			g_hInstance = hInstance;
 
 			break;
 
 		case DLL_PROCESS_DETACH:
-			// Stop D3D hooking for CS:GO
-			if (n_sourceEXE == 1)
+			if (n_sourceEXE == 1) // Stop D3D hooking for CS:GO
 			{
+				DeleteCriticalSection(&d3d9EndMutex);
+
 				bCaptureThreadStop = true;
 				WaitForSingleObject(hCaptureThread, 300);
 
 				if (dummyEvent)
 					CloseHandle(dummyEvent);
+
 				if (hwndSender)
 					DestroyWindow(hwndSender);
+
 				if (hCaptureThread)
 					CloseHandle(hCaptureThread);
 			}
@@ -102,9 +112,6 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 			CRawInput::hookLibrary(false);
 			CRawInput::unload();
 
-#ifdef _DEBUG
-			OutputDebugString("Unloaded RInput");
-#endif
 			break;
 	}
 
@@ -113,10 +120,6 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 
 extern "C" __declspec(dllexport) void entryPoint()
 {
-#ifdef _DEBUG
-	OutputDebugString("entryPoint called");
-#endif
-
 	HANDLE hEvent = OpenEvent(EVENT_ALL_ACCESS, FALSE, EVENTNAME);
 	if (!hEvent)
 		displayError(L"Could not open interprocess communication event.");
@@ -140,10 +143,6 @@ extern "C" __declspec(dllexport) void entryPoint()
 
 	if (!CRawInput::pollInput())
 		displayError(L"Failed to poll mouse input");
-
-#ifdef _DEBUG
-	OutputDebugString("Finished entryPoint");
-#endif
 }
 
 // Validate that we are working with at least Windows XP
@@ -157,13 +156,16 @@ inline bool validateVersion()
 void displayError(WCHAR* pwszError)
 {
 	MessageBoxW(NULL, pwszError, L"Raw Input error!", MB_ICONERROR | MB_OK);
+
 	CRawInput::hookLibrary(false);
+
 	unloadLibrary();
 }
 
 void unloadLibrary()
 {
-	__asm {
+	__asm
+	{
 		push -2
 		push 0
 		push g_hInstance

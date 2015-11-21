@@ -1,12 +1,5 @@
-/********************************************************************************
- hook.h, hook.cpp, and d3d9.cpp contain the code for fixing the bugs in
- the CS:GO buy and escape menus, and are only called for CS:GO.
-
- Copyright (C) 2012 Hugh Bailey <obs.jim@gmail.com>
-
- This new code was adapted from the Open Broadcaster Software source,
- obtained from https://github.com/jp9000/OBS
-********************************************************************************/
+#ifndef _HOOK_H_
+#define _HOOK_H_
 
 #include <windows.h>
 #include <shlobj.h>
@@ -14,9 +7,19 @@
 #define PSAPI_VERSION 1
 #include <psapi.h>
 
-#pragma intrinsic(memcpy, memset)
+#pragma intrinsic(memcpy)
 
 #include <string>
+
+extern HINSTANCE g_hInstance;
+extern CRITICAL_SECTION d3d9EndMutex;
+extern HANDLE dummyEvent;
+extern HWND hwndSender;
+extern bool bCaptureThreadStop;
+
+bool InitD3D9Capture();
+DWORD WINAPI CaptureThread(HANDLE hDllMainThread);
+void CheckD3D9Capture();
 
 typedef unsigned long UPARAM;
 
@@ -37,14 +40,13 @@ public:
 	{
 		if (bHooked)
 		{
-			if (funcIn == func)
+			if ((funcIn == func) && (hookFunc != hookFuncIn))
 			{
-				if (hookFunc != hookFuncIn)
-				{
-					hookFunc = hookFuncIn;
-					Rehook();
-					return true;
-				}
+				hookFunc = hookFuncIn;
+
+				Rehook();
+
+				return true;
 			}
 
 			Unhook();
@@ -54,6 +56,7 @@ public:
 		hookFunc = hookFuncIn;
 
 		DWORD oldProtect;
+
 		if (!VirtualProtect((LPVOID)func, 14, PAGE_EXECUTE_READWRITE, &oldProtect))
 			return false;
 
@@ -62,6 +65,7 @@ public:
 			CHAR *modName, *ourName;
 			CHAR szModName[MAX_PATH];
 			CHAR szOurName[MAX_PATH];
+
 			DWORD memAddress;
 
 			MEMORY_BASIC_INFORMATION mem;
@@ -105,8 +109,8 @@ public:
 
 		UPARAM startAddr = UPARAM(func);
 		UPARAM targetAddr = UPARAM(hookFunc);
-		ULONG64 offset, diff;
 
+		ULONG64 offset, diff;
 		offset = targetAddr - (startAddr + 5);
 
 		if (startAddr + 5 > targetAddr)
@@ -115,14 +119,10 @@ public:
 			diff = targetAddr - startAddr + 5;
 
 		DWORD oldProtect;
-
-		{
-			VirtualProtect((LPVOID)func, 5, PAGE_EXECUTE_READWRITE, &oldProtect);
-
-			LPBYTE addrData = (LPBYTE)func;
-			*addrData = 0xE9;
-			*(DWORD*)(addrData+1) = DWORD(offset);
-		}
+		VirtualProtect((LPVOID)func, 5, PAGE_EXECUTE_READWRITE, &oldProtect);
+		LPBYTE addrData = (LPBYTE)func;
+		*addrData = 0xE9;
+		*(DWORD*)(addrData+1) = DWORD(offset);
 
 		bHooked = true;
 	}
@@ -147,10 +147,4 @@ inline FARPROC GetVTable(LPVOID ptr, UINT funcOffset)
 	return (FARPROC)(*(vtable+funcOffset));
 }
 
-extern HINSTANCE g_hInstance;
-extern HWND hwndSender;
-extern bool bTargetAcquired;
-extern bool bCaptureThreadStop;
-extern bool bD3D9Hooked;
-DWORD WINAPI CaptureThread(HANDLE hDllMainThread);
-bool InitD3D9Capture();
+#endif

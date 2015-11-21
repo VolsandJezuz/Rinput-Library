@@ -33,26 +33,22 @@
 
 #pragma intrinsic(memset)
 
-// Define the to be hooked functions
+// Define functions that are to be hooked and detoured
 extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpGetCursorPos(LPPOINT lpPoint), GetCursorPos);
 extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpSetCursorPos(int x, int y), SetCursorPos);
 
 // Initialize static variables
-bool CRawInput::bRegistered = false;
 HWND CRawInput::hwndInput = NULL;
-long CRawInput::x = 0;
-long CRawInput::y = 0;
-long CRawInput::set_x = 0;
-long CRawInput::set_y = 0;
 long CRawInput::hold_x = 0;
 long CRawInput::hold_y = 0;
+long CRawInput::set_x = 0;
+long CRawInput::set_y = 0;
+bool CRawInput::bRegistered = false;
+long CRawInput::x = 0;
+long CRawInput::y = 0;
 int CRawInput::SCP = 0;
-bool CRawInput::GCP = false;
 int CRawInput::consecG = 0;
-
-extern int n_sourceEXE;
-extern bool sourceEXE;
-extern int frame_rendered;
+bool CRawInput::GCP = false;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
@@ -70,7 +66,6 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 	// Register the window to catch WM_INPUT events
 	WNDCLASSEX wcex;
 	memset(&wcex, 0, sizeof(WNDCLASSEX));
-
 	wcex.cbSize = sizeof(WNDCLASSEX);
 	wcex.lpfnWndProc = (WNDPROC)wpInput;
 	wcex.lpszClassName = INPUTWINDOW;
@@ -83,15 +78,12 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 
 	// Create the window to catch WM_INPUT events	
 	CRawInput::hwndInput = CreateWindowEx(NULL, INPUTWINDOW, INPUTWINDOW, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL);
+
 	if (!CRawInput::hwndInput) 
 	{
 		lstrcpyW(pwszError, L"Failed to create input window!");
 		return false;
 	}
-
-#ifdef _DEBUG
-	OutputDebugString("Created Raw Input Window");
-#endif
 
 	// Unregister the window class
 	UnregisterClass(INPUTWINDOW, NULL);
@@ -104,7 +96,8 @@ bool CRawInput::initInput(WCHAR* pwszError)
 	// Now behaves correctly with windowed mode
 	HWND client_hwnd = GetForegroundWindow();
 	RECT client_rect;
-	if(GetClientRect(client_hwnd, &client_rect))
+
+	if (GetClientRect(client_hwnd, &client_rect))
 	{
 		long clientx = client_rect.right >> 1;
 		long clienty = client_rect.bottom >> 1;
@@ -125,7 +118,6 @@ bool CRawInput::initInput(WCHAR* pwszError)
 
 	RAWINPUTDEVICE rMouse;
 	memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
-
 	// New flag allows accumulation to be maintained while alt-tabbed
 	rMouse.dwFlags = RIDEV_INPUTSINK;
 	rMouse.hwndTarget = CRawInput::hwndInput;
@@ -155,10 +147,8 @@ LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPA
 {
 	switch (message)
 	{
-		case WM_INPUT:{
-#ifdef _DEBUG
-			OutputDebugString("WM_INPUT event");
-#endif
+		case WM_INPUT:
+		{
 			UINT uiSize = RAWPTRSIZE;
 			static unsigned char lpb[RAWPTRSIZE];
 			RAWINPUT* rwInput;
@@ -173,11 +163,14 @@ LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPA
 					CRawInput::y += rwInput->data.mouse.lLastY;
 				}
 			}
+
 			break;
 		}
+
 		case WM_DESTROY:
 			PostQuitMessage(0);
 			break;
+
 		default: return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 
@@ -187,7 +180,8 @@ LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPA
 int __stdcall CRawInput::hSetCursorPos(int x, int y)
 {
 	// Skips unnecessary second SetCursorPos call for source games
-	if (!CRawInput::SCP && !TrmpSetCursorPos(x, y)) return 1;
+	if (!CRawInput::SCP && !TrmpSetCursorPos(x, y))
+		return 1;
 
 	CRawInput::set_x = (long)x;
 	CRawInput::set_y = (long)y;
@@ -195,11 +189,14 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 	if (sourceEXE)
 	{
 		CRawInput::consecG = 0;
+
 		// Alt-tab bug fix
 		if ((CRawInput::set_x == 0) && (CRawInput::set_y == 0))
 			CRawInput::GCP = true;
+
 		// Console bug fix
 		++CRawInput::SCP;
+
 		if (CRawInput::SCP == 1)
 		{
 			CRawInput::set_x -= CRawInput::x;
@@ -207,17 +204,16 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 		}
 		else if (CRawInput::SCP == 2)
 		{
-			frame_rendered = 0;
+			consec_endscene = 0;
+
 			CRawInput::GCP = false;
+
 			CRawInput::SCP = 0;
+
 			CRawInput::hold_x = CRawInput::set_x;
 			CRawInput::hold_y = CRawInput::set_y;
 		}
 	}
-
-#ifdef _DEBUG
-	OutputDebugString("Set coordinates");
-#endif
 
 	return 0;
 }
@@ -229,16 +225,18 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	CRawInput::set_y += CRawInput::y;
 
 	CRawInput::SCP = 0;
-	// Bug fix for cursor hitting side of screen in TF2 backpack
+
 	if (CRawInput::consecG < 2)
 		++CRawInput::consecG;
-	// Changed to be active for hl2.exe only, the exe that TF2 uses
+
+	// Bug fix for cursor hitting side of screen in TF2 backpack
 	if ((n_sourceEXE == 2) && (CRawInput::consecG == 2))
 	{
 		if (CRawInput::set_x >= CRawInput::hold_x << 1)
 			CRawInput::set_x = (CRawInput::hold_x << 1) - 1;
 		else if (CRawInput::set_x < 0)
 			CRawInput::set_x = 0;
+
 		if (CRawInput::set_y >= CRawInput::hold_y << 1)
 			CRawInput::set_y = (CRawInput::hold_y << 1) - 1;
 		else if (CRawInput::set_y < 0)
@@ -248,12 +246,12 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	// Alt-tab bug fix
 	if (!CRawInput::GCP)
 	{
-		// Allows 3 frames w/o SetCursorPos to be safe, 2 gives loss
-		if (frame_rendered == 3)
+		// Buy and escape menu bug fix--respects resolution changes
+		if (consec_endscene == 5)
 		{
-			// Buy and escape menu bug fix--respects resolution changes
 			HWND new_hwnd = GetForegroundWindow();
 			RECT new_rect;
+
 			if(GetClientRect(new_hwnd, &new_rect))
 			{
 				long newx = new_rect.right >> 1;
@@ -266,6 +264,7 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 				CRawInput::set_y = new_Point.y;
 			}
 		}
+
 		lpPoint->x = CRawInput::set_x;
 		lpPoint->y = CRawInput::set_y;
 	}
@@ -279,10 +278,6 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	CRawInput::x = 0;
 	CRawInput::y = 0;
 
-#ifdef _DEBUG
-	OutputDebugString("Returned coordinates");
-#endif
-
 	return 0;
 }
 
@@ -292,25 +287,11 @@ bool CRawInput::hookLibrary(bool bInstall)
 	{
 		if (!DetourFunctionWithTrampoline((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos) || !DetourFunctionWithTrampoline((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos))
 			return false;
-#ifdef _DEBUG
-		else
-			OutputDebugString("Hooked GetCursorPos and SetCursorPos");
-#endif
 	}
 	else 
 	{
-		if (DetourRemove((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos))
-		{
-#ifdef _DEBUG
-			OutputDebugString("Removed GetCursorPos hook");
-#endif
-		}
-		if (DetourRemove((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos))
-		{
-#ifdef _DEBUG
-			OutputDebugString("Removed SetCursorPos hook");
-#endif
-		}
+		DetourRemove((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos);
+		DetourRemove((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos);
 	}
 
 	return true;
@@ -322,18 +303,12 @@ void CRawInput::unload()
 	{
 		RAWINPUTDEVICE rMouse;
 		memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
-
 		rMouse.dwFlags |= RIDEV_REMOVE;
 		rMouse.hwndTarget = NULL;
 		rMouse.usUsagePage = 0x01;
 		rMouse.usUsage = 0x02;
-
 		RegisterRawInputDevices(&rMouse, 1, sizeof(RAWINPUTDEVICE));
-		DestroyWindow(hwndInput);
 
-#ifdef _DEBUG
-		OutputDebugString("Unregistered mouse device");
-		OutputDebugString("Closed Input Window");
-#endif
+		DestroyWindow(hwndInput);
 	}
 }

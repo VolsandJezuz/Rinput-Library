@@ -13,17 +13,12 @@
 #define KERNEL_LIB L"kernel32.dll"
 
 #include "rawinput.h" // Raw input class
-#include "hook.h" // D3D9 hooking
+#include "hook.h" // D3D9 hooking class
 
-HINSTANCE g_hInstance = NULL;
-int n_sourceEXE = 0;
-bool sourceEXE = false;
-int frame_rendered = 0;
-
-// Only handle the hooking and dll functions here
 extern "C" __declspec(dllexport) void entryPoint();
-inline bool validateVersion();
-void unloadLibrary();
+
 void displayError(WCHAR* pwszError);
+
+inline bool validateVersion();
 
 #endif
