@@ -99,8 +99,8 @@ bool CRawInput::initInput(WCHAR* pwszError)
 
 	if (GetClientRect(client_hwnd, &client_rect))
 	{
-		long clientx = client_rect.right >> 1;
-		long clienty = client_rect.bottom >> 1;
+		long clientx = client_rect.right / 2;
+		long clienty = client_rect.bottom / 2;
 		POINT client_point;
 		client_point.x = clientx;
 		client_point.y = clienty;
@@ -148,30 +148,31 @@ LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPA
 	switch (message)
 	{
 		case WM_INPUT:
-		{
-			UINT uiSize = RAWPTRSIZE;
-			static unsigned char lpb[RAWPTRSIZE];
-			RAWINPUT* rwInput;
-
-			if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, lpb, &uiSize, RAWINPUTHDRSIZE) != -1)
 			{
-				rwInput = (RAWINPUT*)lpb;
+				UINT uiSize = RAWPTRSIZE;
+				static unsigned char lpb[RAWPTRSIZE];
+				RAWINPUT* rwInput;
 
-				if (!rwInput->header.dwType)
+				if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, lpb, &uiSize, RAWINPUTHDRSIZE) != -1)
 				{
-					CRawInput::x += rwInput->data.mouse.lLastX;
-					CRawInput::y += rwInput->data.mouse.lLastY;
-				}
-			}
+					rwInput = (RAWINPUT*)lpb;
 
-			break;
-		}
+					if (!rwInput->header.dwType)
+					{
+						CRawInput::x += rwInput->data.mouse.lLastX;
+						CRawInput::y += rwInput->data.mouse.lLastY;
+					}
+				}
+
+				break;
+			}
 
 		case WM_DESTROY:
 			PostQuitMessage(0);
 			break;
 
-		default: return DefWindowProc(hWnd, message, wParam, lParam);
+		default:
+			return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 
 	return 0;
@@ -188,7 +189,16 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 
 	if (sourceEXE)
 	{
-		CRawInput::consecG = 0;
+		if (n_sourceEXE == 2)
+		{
+			if (((consec_frames == 3) && (CRawInput::consecG == 2)) && !CRawInput::GCP)
+				goto skipGCPreset;
+
+			CRawInput::consecG = 0;
+		}
+
+		skipGCPreset:
+		consec_frames = 0;
 
 		// Alt-tab bug fix
 		if ((CRawInput::set_x == 0) && (CRawInput::set_y == 0))
@@ -204,8 +214,6 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 		}
 		else if (CRawInput::SCP == 2)
 		{
-			consec_endscene = 0;
-
 			CRawInput::GCP = false;
 
 			CRawInput::SCP = 0;
@@ -226,36 +234,43 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 
 	CRawInput::SCP = 0;
 
-	if (CRawInput::consecG < 2)
-		++CRawInput::consecG;
-
-	// Bug fix for cursor hitting side of screen in TF2 backpack
-	if ((n_sourceEXE == 2) && (CRawInput::consecG == 2))
+	if (n_sourceEXE == 2)
 	{
-		if (CRawInput::set_x >= CRawInput::hold_x << 1)
-			CRawInput::set_x = (CRawInput::hold_x << 1) - 1;
-		else if (CRawInput::set_x < 0)
-			CRawInput::set_x = 0;
+		if (CRawInput::consecG < 2)
+			++CRawInput::consecG;
 
-		if (CRawInput::set_y >= CRawInput::hold_y << 1)
-			CRawInput::set_y = (CRawInput::hold_y << 1) - 1;
-		else if (CRawInput::set_y < 0)
-			CRawInput::set_y = 0;
+		// Bug fix for cursor hitting side of screen in TF2 backpack
+		if (CRawInput::consecG == 2)
+		{
+			if (CRawInput::set_x >= CRawInput::hold_x << 1)
+				CRawInput::set_x = (CRawInput::hold_x << 1) - 1;
+			else if (CRawInput::set_x < 0)
+				CRawInput::set_x = 0;
+
+			if (CRawInput::set_y >= CRawInput::hold_y << 1)
+				CRawInput::set_y = (CRawInput::hold_y << 1) - 1;
+			else if (CRawInput::set_y < 0)
+				CRawInput::set_y = 0;
+		}
 	}
 
 	// Alt-tab bug fix
 	if (!CRawInput::GCP)
 	{
 		// Buy and escape menu bug fix--respects resolution changes
-		if (consec_endscene == 5)
+		if (consec_frames == 3)
 		{
+			// Needed to not break backpack in TF2
+			if (CRawInput::consecG == 2)
+				goto skiprecenter;
+
 			HWND new_hwnd = GetForegroundWindow();
 			RECT new_rect;
 
 			if(GetClientRect(new_hwnd, &new_rect))
 			{
-				long newx = new_rect.right >> 1;
-				long newy = new_rect.bottom >> 1;
+				long newx = new_rect.right / 2;
+				long newy = new_rect.bottom / 2;
 				POINT new_Point;
 				new_Point.x = newx;
 				new_Point.y = newy;
@@ -265,6 +280,7 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 			}
 		}
 
+		skiprecenter:
 		lpPoint->x = CRawInput::set_x;
 		lpPoint->y = CRawInput::set_y;
 	}

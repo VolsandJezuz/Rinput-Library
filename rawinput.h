@@ -13,7 +13,7 @@
 extern void displayError(WCHAR* pwszError);
 extern bool sourceEXE;
 extern int n_sourceEXE;
-extern int consec_endscene;
+extern int consec_frames;
 
 /**
  * Note from original author (abort):

@@ -11,11 +11,23 @@
 #include "hook.h"
 #include <d3d9.h>
 
+typedef HRESULT (WINAPI *PRESENTPROC)(IDirect3DDevice9*, const RECT*, const RECT*, HWND, const RGNDATA*);
+typedef HRESULT (WINAPI *PRESENTEXPROC)(IDirect3DDevice9*, const RECT*, const RECT*, HWND, const RGNDATA*, DWORD);
+typedef HRESULT (WINAPI *SWAPPRESENTPROC)(IDirect3DSwapChain9*, const RECT*, const RECT*, HWND, const RGNDATA*, DWORD);
+
 HookData d3d9EndScene;
+HookData d3d9Reset;
+HookData d3d9ResetEx;
+HookData d3d9Present;
+HookData d3d9PresentEx;
+HookData d3d9SwapPresent;
 
 static LPVOID lpCurrentDevice = NULL;
-int consec_endscene = 0;
-static HMODULE hD3D9Dll = NULL;
+BOOL bD3D9Ex = FALSE;
+void SetupD3D9(IDirect3DDevice9 *device);
+static int presentRecurse = 0;
+int consec_frames = 0;
+HMODULE hD3D9Dll = NULL;
 
 typedef HRESULT(STDMETHODCALLTYPE *D3D9EndScenePROC)(IDirect3DDevice9 *device);
 
@@ -30,14 +42,18 @@ HRESULT STDMETHODCALLTYPE D3D9EndScene(IDirect3DDevice9 *device)
 		IDirect3D9 *d3d;
 
 		if(SUCCEEDED(device->GetDirect3D(&d3d)))
+		{
+			IDirect3D9 *d3d9ex;
+
+			if(bD3D9Ex = SUCCEEDED(d3d->QueryInterface(__uuidof(IDirect3D9Ex), (void**)&d3d9ex)))
+				d3d9ex->Release();
+
 			d3d->Release();
+		}
 
 		lpCurrentDevice = device;
+		SetupD3D9(device);
 	}
-
-	// EndScene is called twice per frame render
-	if (consec_endscene < 5)
-		++consec_endscene;
 
 	HRESULT hRes = device->EndScene();
 
@@ -46,6 +62,134 @@ HRESULT STDMETHODCALLTYPE D3D9EndScene(IDirect3DDevice9 *device)
 	LeaveCriticalSection(&d3d9EndMutex);
 
 	return hRes;
+}
+
+HRESULT STDMETHODCALLTYPE D3D9Present(IDirect3DDevice9 *device, CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion)
+{
+	d3d9Present.Unhook();
+
+	if (!presentRecurse)
+	{
+		if (consec_frames < 3)
+			++consec_frames;
+	}
+
+	presentRecurse++;
+	HRESULT hRes = device->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
+	presentRecurse--;
+	
+	d3d9Present.Rehook();
+	
+	return hRes;
+}
+
+HRESULT STDMETHODCALLTYPE D3D9PresentEx(IDirect3DDevice9Ex *device, CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion, DWORD dwFlags)
+{
+	d3d9PresentEx.Unhook();
+
+	if (!presentRecurse)
+	{
+		if (consec_frames < 3)
+			++consec_frames;
+	}
+
+	presentRecurse++;
+	HRESULT hRes = device->PresentEx(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
+	presentRecurse--;
+
+	d3d9PresentEx.Rehook();
+
+	return hRes;
+}
+
+HRESULT STDMETHODCALLTYPE D3D9SwapPresent(IDirect3DSwapChain9 *swap, CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion, DWORD dwFlags)
+{
+	d3d9SwapPresent.Unhook();
+
+	presentRecurse++;
+	HRESULT hRes = swap->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
+	presentRecurse--;
+
+	d3d9SwapPresent.Rehook();
+
+	return hRes;
+}
+
+typedef HRESULT(STDMETHODCALLTYPE *D3D9ResetPROC)(IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *params);
+
+HRESULT STDMETHODCALLTYPE D3D9Reset(IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *params)
+{
+	d3d9Reset.Unhook();
+
+	HRESULT hRes = device->Reset(params);
+
+	SetupD3D9(device);
+
+	d3d9Reset.Rehook();
+
+	return hRes;
+}
+
+
+HRESULT STDMETHODCALLTYPE D3D9ResetEx(IDirect3DDevice9Ex *device, D3DPRESENT_PARAMETERS *params, D3DDISPLAYMODEEX *fullscreenData)
+{
+	d3d9ResetEx.Unhook();
+	d3d9Reset.Unhook();
+
+	HRESULT hRes = device->ResetEx(params, fullscreenData);
+
+	if(lpCurrentDevice == NULL)
+		bD3D9Ex = true;
+
+	SetupD3D9(device);
+
+	d3d9Reset.Rehook();
+	d3d9ResetEx.Rehook();
+
+	return hRes;
+}
+
+void SetupD3D9(IDirect3DDevice9 *device)
+{
+	IDirect3DSwapChain9 *swapChain = NULL;
+
+	if (SUCCEEDED(device->GetSwapChain(0, &swapChain)))
+	{
+		IDirect3D9 *d3d;
+
+		if (SUCCEEDED(device->GetDirect3D(&d3d)))
+		{
+			IDirect3D9 *d3d9ex;
+
+			if (bD3D9Ex = SUCCEEDED(d3d->QueryInterface(__uuidof(IDirect3D9Ex), (void**)&d3d9ex)))
+				d3d9ex->Release();
+
+			d3d->Release();
+		}
+
+		d3d9Present.Hook(GetVTable(device, (68/4)), (FARPROC)D3D9Present);
+
+		if(bD3D9Ex)
+		{
+			FARPROC curPresentEx = GetVTable(device, (484/4));
+			d3d9PresentEx.Hook(curPresentEx, (FARPROC)D3D9PresentEx);
+			d3d9ResetEx.Hook(GetVTable(device, (528/4)), (FARPROC)D3D9ResetEx);
+		}
+
+		d3d9Reset.Hook(GetVTable(device, (64/4)), (FARPROC)D3D9Reset);
+		d3d9SwapPresent.Hook(GetVTable(swapChain, (12/4)), (FARPROC)D3D9SwapPresent);
+		d3d9Present.Rehook();
+		d3d9SwapPresent.Rehook();
+		d3d9Reset.Rehook();
+
+		if(bD3D9Ex)
+		{
+			d3d9PresentEx.Rehook();
+			d3d9ResetEx.Rehook();
+		}
+
+		swapChain->Release();
+	}
 }
 
 typedef IDirect3D9* (WINAPI*D3D9CREATEPROC)(UINT);

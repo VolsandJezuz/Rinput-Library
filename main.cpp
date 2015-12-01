@@ -48,13 +48,16 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 			if (!DisableThreadLibraryCalls(hInstance))
 				return 0;
 
+			g_hInstance = hInstance;
+
 			{ // Get process and enable bug fixes for source games
 				char szEXEPath[MAX_PATH];
 				GetModuleFileNameA(NULL, szEXEPath, sizeof(szEXEPath));
 				PathStripPathA(szEXEPath);
 
-				// Bug fixes now limited to source games that have been tested
+				// Bug fixes now limited to tested source games
 				char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
+				bool b_sourceEXE = false;
 
 				for (char **iSource_exes = source_exes; *iSource_exes != NULL; ++iSource_exes)
 				{
@@ -62,9 +65,34 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 
 					if ((std::string)szEXEPath == (std::string)*iSource_exes)
 					{
-						// Start D3D hooking for CS:GO
-						if (n_sourceEXE == 1)
+						sourceEXE = true;
+
+						if (n_sourceEXE <= 2) // CS:GO and TF2 D3D hooks
 						{
+							if (n_sourceEXE == 2)
+							{
+								// Make sure hl2.exe is TF2
+								char TF2path[MAX_PATH];
+								GetModuleFileNameA(NULL, TF2path, sizeof(TF2path));
+								PathRemoveFileSpecA(TF2path);
+								std::string sTF2path = (std::string)TF2path;
+								char testTF2[16];
+
+								for (size_t j = 1; j <= 15; ++j)
+									testTF2[j] = TF2path[sTF2path.size() + j - 15];
+
+								char tf2[16] = "Team Fortress 2";
+
+								for (int k = 1; k < 16; ++k)
+								{
+									if (testTF2[k] != tf2[k])
+									{
+										b_sourceEXE = true;
+										goto skipd3d;
+									}
+								}
+							}
+
 							HANDLE hThread = NULL;
 							HANDLE hDllMainThread = OpenThread(THREAD_ALL_ACCESS, NULL, GetCurrentThreadId());
 
@@ -78,19 +106,20 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 							CloseHandle(hThread);
 						}
 
-						sourceEXE = true;
-
+						skipd3d:
 						break;
 					}
 				}
-			}
 
-			g_hInstance = hInstance;
+				if (b_sourceEXE)
+					n_sourceEXE = 5;
+
+			}
 
 			break;
 
 		case DLL_PROCESS_DETACH:
-			if (n_sourceEXE == 1) // Stop D3D hooking for CS:GO
+			if (n_sourceEXE <= 2) // Stop D3D hooking for CS:GO and TF2
 			{
 				DeleteCriticalSection(&d3d9EndMutex);
 
