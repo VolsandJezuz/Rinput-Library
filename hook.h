@@ -2,14 +2,11 @@
 #define _HOOK_H_
 
 #include <windows.h>
-#include <shlobj.h>
-
 #define PSAPI_VERSION 1
 #include <psapi.h>
+#include <string>
 
 #pragma intrinsic(memcpy)
-
-#include <string>
 
 extern HINSTANCE g_hInstance;
 extern CRITICAL_SECTION d3d9EndMutex;

@@ -9,6 +9,7 @@
 ********************************************************************************/
 
 #include "hook.h"
+#include <shlobj.h>
 #include <d3d9.h>
 
 HookData d3d9EndScene;
