@@ -20,9 +20,9 @@ Compiled with Visual Studio 2008, though you may be able to get it to work with 
 - Add the Microsoft DirectX SDK(https://www.microsoft.com/en-us/download/confirmation.aspx?id=6812) folders as additional Include directory and additional linker library directory (the x86 folder)
 - Compiled with Multi-threaded DLL runtime library for linking
 - It may be necessary to set Enable C++ Exceptions to Yes (/EHsc), as it didn't seem to want to compile properly in set to No
-- Set Calling Convention __cdecl (/Gd), as it seems to be the only one that performs well
+- Set Calling Convention __cdecl (/Gd), as it seems to be the only one that performs well and allow D3D9 to be hooked
 - Set the Entry Point as DllMain
-- Add shlwapi.lib, dxguid.lib, and psapi.lib as an Additional Dependency in the Linker options
+- Add shlwapi.lib, dxguid.lib, psapi.lib, and comctl32.lib as an Additional Dependency in the Linker options
 - Use x86 architecture for compiling (i.e., RInput does not support x64 applications)
 - MS Detours 1.5 header and library were acquired from http://home.comcast.net/~wiccaan/downloads/Detours.rar
 

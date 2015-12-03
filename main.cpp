@@ -32,6 +32,7 @@
 #include "main.h"
 #include <shlwapi.h>
 
+HINSTANCE g_hInstance = NULL;
 int n_sourceEXE = 0;
 bool sourceEXE = false;
 HANDLE hCaptureThread = NULL;
@@ -44,85 +45,87 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 	switch(dwReason)
 	{
 		case DLL_PROCESS_ATTACH:
-			// No need for a threaded entry
-			if (!DisableThreadLibraryCalls(hInstance))
-				return 0;
+			{
+				// No need for a threaded entry
+				if (!DisableThreadLibraryCalls(hInstance))
+					return 0;
 
-			g_hInstance = hInstance;
+				g_hInstance = hInstance;
 
-			{ // Get process and enable bug fixes for source games
 				char szEXEPath[MAX_PATH];
-				GetModuleFileNameA(NULL, szEXEPath, sizeof(szEXEPath));
-				PathStripPathA(szEXEPath);
 
-				// Bug fixes now limited to tested source games
-				char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
-				bool b_sourceEXE = false;
-
-				for (char **iSource_exes = source_exes; *iSource_exes != NULL; ++iSource_exes)
+				// Detect source games for enabling specific bug fixes
+				if (GetModuleFileNameA(NULL, szEXEPath, sizeof(szEXEPath)))
 				{
-					++n_sourceEXE;
+					char TF2path[sizeof(szEXEPath)];
+					strcpy_s(TF2path, _countof(TF2path), szEXEPath);
 
-					if ((std::string)szEXEPath == (std::string)*iSource_exes)
+					PathStripPathA(szEXEPath);
+
+					// Bug fixes now limited to tested source games
+					char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
+					bool b_sourceEXE = false;
+
+					for (char **iSource_exes = source_exes; *iSource_exes != NULL; ++iSource_exes)
 					{
-						sourceEXE = true;
+						++n_sourceEXE;
 
-						if (n_sourceEXE <= 2) // CS:GO and TF2 D3D hooks
+						if ((std::string)szEXEPath == (std::string)*iSource_exes)
 						{
-							if (n_sourceEXE == 2)
+							sourceEXE = true;
+
+							// Start CS:GO and TF2 D3D9 hooking
+							if (n_sourceEXE <= 2)
 							{
-								// Make sure hl2.exe is TF2
-								char TF2path[MAX_PATH];
-								GetModuleFileNameA(NULL, TF2path, sizeof(TF2path));
-								PathRemoveFileSpecA(TF2path);
-								std::string sTF2path = (std::string)TF2path;
-								char testTF2[16];
-
-								for (size_t j = 1; j <= 15; ++j)
-									testTF2[j] = TF2path[sTF2path.size() + j - 15];
-
-								char tf2[16] = "Team Fortress 2";
-
-								for (int k = 1; k < 16; ++k)
+								if (n_sourceEXE == 2)
 								{
-									if (testTF2[k] != tf2[k])
+									// Make sure hl2.exe is TF2
+									PathRemoveFileSpecA(TF2path);
+									std::string sTF2path = (std::string)TF2path;
+									char testTF2[16];
+
+									for (size_t j = 1; j <= 15; ++j)
+										testTF2[j] = TF2path[sTF2path.size() + j - 15];
+
+									char tf2[16] = "Team Fortress 2";
+
+									for (int k = 1; k < 16; ++k)
 									{
-										b_sourceEXE = true;
-										goto skipd3d;
+										if (testTF2[k] != tf2[k])
+										{
+											b_sourceEXE = true;
+											goto skip_d3d;
+										}
 									}
 								}
+
+								HANDLE hDllMainThread = OpenThread(THREAD_ALL_ACCESS, NULL, GetCurrentThreadId());
+
+								if (!(hCaptureThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, (LPVOID)hDllMainThread, 0, 0)))
+								{
+									CloseHandle(hDllMainThread);
+									return 0;
+								}
 							}
-
-							HANDLE hThread = NULL;
-							HANDLE hDllMainThread = OpenThread(THREAD_ALL_ACCESS, NULL, GetCurrentThreadId());
-
-							if (!(hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, (LPVOID)hDllMainThread, 0, 0)))
-							{
-								CloseHandle(hDllMainThread);
-								return 0;
-							}
-
-							hCaptureThread = hThread;
-							CloseHandle(hThread);
+skip_d3d:
+							break;
 						}
-
-						skipd3d:
-						break;
 					}
+
+					// hl2.exe is not TF2
+					if (b_sourceEXE)
+						n_sourceEXE = 5;
 				}
+				else
+					n_sourceEXE = 4;
 
-				if (b_sourceEXE)
-					n_sourceEXE = 5;
-
+				break;
 			}
 
-			break;
-
 		case DLL_PROCESS_DETACH:
-			if (n_sourceEXE <= 2) // Stop D3D hooking for CS:GO and TF2
+			// Stop CS:GO and TF2 D3D9 hooking
+			if (n_sourceEXE <= 2)
 			{
-				DeleteCriticalSection(&d3d9EndMutex);
-
 				bCaptureThreadStop = true;
 				WaitForSingleObject(hCaptureThread, 300);
 
@@ -131,14 +134,10 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 
 				if (hwndSender)
 					DestroyWindow(hwndSender);
-
-				if (hCaptureThread)
-					CloseHandle(hCaptureThread);
 			}
 
 			CRawInput::hookLibrary(false);
 			CRawInput::unload();
-
 			break;
 	}
 
@@ -148,6 +147,7 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 extern "C" __declspec(dllexport) void entryPoint()
 {
 	HANDLE hEvent = OpenEvent(EVENT_ALL_ACCESS, FALSE, EVENTNAME);
+
 	if (!hEvent)
 		displayError(L"Could not open interprocess communication event.");
 

@@ -36,7 +36,7 @@ inline bool AttemptToHookSomething()
 
 static inline HWND CreateDummyWindow(LPCTSTR lpClass, LPCTSTR lpName)
 {
-	return CreateWindowEx (0, lpClass, lpName, WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 0, 0, 1, 1, NULL, NULL, g_hInstance, NULL);
+	return CreateWindowEx(0, lpClass, lpName, WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 0, 0, 1, 1, NULL, NULL, g_hInstance, NULL);
 }
 
 static DWORD WINAPI DummyWindowThread(LPVOID lpBla)
@@ -60,7 +60,7 @@ static DWORD WINAPI DummyWindowThread(LPVOID lpBla)
 
 	MSG msg;
 
-	while (GetMessage(&msg, NULL, 0, 0))
+	while (GetMessage(&msg, NULL, 0, 0) > 0)
 	{
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
@@ -97,10 +97,14 @@ DWORD WINAPI CaptureThread(HANDLE hDllMainThread)
 	for (size_t n = 0; !bCaptureThreadStop; ++n)
 	{
 		// Less frequent loop interations reduce resource usage
-		if (n % 16 == 0) AttemptToHookSomething();
+		if (n % 16 == 0)
+			AttemptToHookSomething();
+
 		// Overall interval for checking EndScene hook is still 4000ms
 		Sleep(250);
 	}
+
+	DeleteCriticalSection(&d3d9EndMutex);
 
 	return 0;
 }

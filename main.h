@@ -2,22 +2,23 @@
 #define _MAIN_H_
 
 #define STRICT
-#define WINVER 0x0501 // Need at least Windows XP
-#define _WIN32_WINDOWS 0x0501 // Need at least Windows XP
-#define _WIN32_WINNT 0x0501 // Need at least Windows XP
+// Need at least Windows XP
+#define WINVER 0x0501
+#define _WIN32_WINDOWS 0x0501
+#define _WIN32_WINNT 0x0501
 #define WIN32_LEAN_AND_MEAN
-
-#define ERROR_BUFFER_SIZE 256 // Amount of bytes to store an error string
-
+// Amount of bytes to store an error string
+#define ERROR_BUFFER_SIZE 256
 #define EVENTNAME "RInputEvent32"
 #define KERNEL_LIB L"kernel32.dll"
 
-#include "rawinput.h" // Raw input class
-#include "hook.h" // D3D9 hooking class
+// Raw input class
+#include "rawinput.h"
+// D3D9 hooking class
+#include "hook.h"
 
 extern "C" __declspec(dllexport) void entryPoint();
 
-HINSTANCE g_hInstance = NULL;
 void displayError(WCHAR* pwszError);
 void unloadLibrary();
 
