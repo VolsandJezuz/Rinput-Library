@@ -180,7 +180,7 @@ unsigned int CRawInput::pollInput()
 {
 	MSG msg;
 
-	while (GetMessage(&msg, CRawInput::hwndInput, 0, 0) > 0)
+	while (GetMessage(&msg, CRawInput::hwndInput, 0, 0) != 0)
 		DispatchMessage(&msg);
 
 	return msg.message;
@@ -233,7 +233,8 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 	{
 		if (n_sourceEXE == 2)
 		{
-			++CRawInput::signal;
+			if (CRawInput::signal >= 1)
+				++CRawInput::signal;
 
 			// Bug fix for Steam overlay in TF2 backpack
 			if (((consec_EndScene == 6) && (CRawInput::consecG == 3)) && !CRawInput::alttab)
@@ -287,15 +288,14 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
 	// Split off raw input handling to accumulate independently
 	CRawInput::set_x += CRawInput::x;
-	CRawInput::set_y += CRawInput::y;
-
-	// Raw input accumulation resets moved here from hSetCursorPos
 	CRawInput::x = 0;
+	CRawInput::set_y += CRawInput::y;
 	CRawInput::y = 0;
 
 	if (n_sourceEXE == 2)
 	{
-		++CRawInput::signal;
+		if (CRawInput::signal >= 1)
+			++CRawInput::signal;
 
 		if (CRawInput::consecG < 3)
 			++CRawInput::consecG;
@@ -371,7 +371,7 @@ LRESULT CALLBACK CRawInput::SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 	{
 		case WM_SETFOCUS:
 			// Bug fix during alt-tab back into TF2 backpack
-			CRawInput::signal = 0;
+			CRawInput::signal = 1;
 			CRawInput::hCreateThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CRawInput::blockInput, NULL, 0, 0);
 			break;
 
@@ -391,8 +391,10 @@ void CRawInput::blockInput()
 	BlockInput(TRUE);
 
 	// Unblock input after 7 SetCursorPos and/or GetCursorPos calls
-	for (size_t q = 0; CRawInput::signal < 7; ++q)
+	for (size_t q = 0; CRawInput::signal < 8; ++q)
 		Sleep(16);
+
+	CRawInput::signal = 0;
 
 	BlockInput(FALSE);
 	CloseHandle(CRawInput::hCreateThread);
