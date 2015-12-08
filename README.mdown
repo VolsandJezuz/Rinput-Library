@@ -4,7 +4,7 @@ RInput is an alternative to in-game raw input, which some users perceive as havi
 ## Requirements
 - OS: Windows XP or later
 - CPU: Intel Pentium 4 or later; or, AMD Opteron, Athlon 64 or later
-- Microsoft Visual C++ 2008 Redistributable - x86 9.0.21022.218 or later (included in RInput release downloads starting with v1.34)
+- Microsoft Visual C++ 2008 Redistributable - x86 9.0.21022.218 or later (included in RInput release downloads starting with v1.34 but only needed if you get a pop-up error like "MSVCR90.dll is missing" when trying to run RInput)
 
 ## Note
 This is a fork of RInput Library v1.31 as originally authored by abort. x64 architecture support was never added by him, but here are some notes on what would need to be changed to accomplish this, in case someone is interested:
@@ -17,7 +17,7 @@ Compiled with Visual Studio 2008, though you may be able to get it to work with 
 - Pick Dynamic Library (.dll) as the configuration type
 - Compile using Multi-Byte Character Set
 - Add the Microsoft SDK (I used v6.0A that came with VS2008/VC++2008) folders as additional Include directory and additional linker library directory
-- Add the Microsoft DirectX SDK(https://www.microsoft.com/en-us/download/confirmation.aspx?id=6812) folders as additional Include directory and additional linker library directory (the x86 folder)
+- Add the Microsoft DirectX SDK (https://www.microsoft.com/en-us/download/confirmation.aspx?id=6812) folders as additional Include directory and additional linker library directory (the x86 folder)
 - Compiled with Multi-threaded DLL runtime library for linking
 - It may be necessary to set Enable C++ Exceptions to Yes (/EHsc), as it didn't seem to want to compile properly in set to No
 - Set Calling Convention __cdecl (/Gd), as it seems to be the only one that performs well and allow D3D9 to be hooked
