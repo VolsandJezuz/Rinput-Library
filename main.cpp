@@ -35,6 +35,7 @@
 HINSTANCE g_hInstance = NULL;
 int n_sourceEXE = 0;
 bool sourceEXE = false;
+HWND hwndClient = NULL;
 HANDLE hCaptureThread = NULL;
 bool bCaptureThreadStop = false;
 
@@ -74,50 +75,46 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 						{
 							sourceEXE = true;
 
-							// Start CS:GO and TF2 D3D9 hooking
-							if (n_sourceEXE <= 2)
+							if (n_sourceEXE == 2)
 							{
-								if (n_sourceEXE == 2)
+								// Make sure hl2.exe is TF2
+								PathRemoveFileSpecA(TF2path);
+								std::string sTF2path = (std::string)TF2path;
+								char testTF2[16];
+
+								for (size_t j = 1; j <= 15; ++j)
+									testTF2[j] = TF2path[sTF2path.size() + j - 15];
+
+								char tf2[16] = "Team Fortress 2";
+
+								for (int k = 1; k < 16; ++k)
 								{
-									// Make sure hl2.exe is TF2
-									PathRemoveFileSpecA(TF2path);
-									std::string sTF2path = (std::string)TF2path;
-									char testTF2[16];
-
-									for (size_t j = 1; j <= 15; ++j)
-										testTF2[j] = TF2path[sTF2path.size() + j - 15];
-
-									char tf2[16] = "Team Fortress 2";
-
-									for (int k = 1; k < 16; ++k)
-									{
-										if (testTF2[k] != tf2[k])
-										{
-											b_sourceEXE = true;
-											goto skip_d3d;
-										}
-									}
-								}
-
-								HANDLE hDllMainThread = OpenThread(THREAD_ALL_ACCESS, NULL, GetCurrentThreadId());
-
-								if (!(hCaptureThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, (LPVOID)hDllMainThread, 0, 0)))
-								{
-									CloseHandle(hDllMainThread);
-									return 0;
+									// check hl2.exe is TF2
+									if (testTF2[k] != tf2[k])
+										n_sourceEXE = 5;
 								}
 							}
-skip_d3d:
+
 							break;
 						}
 					}
-
-					// hl2.exe is not TF2
-					if (b_sourceEXE)
-						n_sourceEXE = 5;
 				}
 				else
 					n_sourceEXE = 4;
+
+				hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
+
+				// Start CS:GO and TF2 D3D9 hooking
+				if (n_sourceEXE <= 2)
+				{
+					HANDLE hDllMainThread = OpenThread(THREAD_ALL_ACCESS, NULL, GetCurrentThreadId());
+
+					if (!(hCaptureThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, (LPVOID)hDllMainThread, 0, 0)))
+					{
+						CloseHandle(hDllMainThread);
+						return 0;
+					}
+				}
 
 				break;
 			}

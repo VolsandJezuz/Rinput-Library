@@ -39,7 +39,7 @@ extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpGetCursorPos(LPPOINT lpPoint), Ge
 extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpSetCursorPos(int x, int y), SetCursorPos);
 
 HWND CRawInput::hwndInput = NULL;
-HWND CRawInput::hwndClient = NULL;
+bool CRawInput::TF2unblock = false;
 long CRawInput::hold_x = 0;
 long CRawInput::hold_y = 0;
 long CRawInput::set_x = 0;
@@ -55,6 +55,15 @@ int CRawInput::SCP = 0;
 bool CRawInput::bSubclass = false;
 HANDLE CRawInput::hCreateThread = NULL;
 
+// Fixed rare packet discrepancy
+CRITICAL_SECTION rawMouseData;
+
+struct WindowHandleStructure
+{
+	unsigned long PID;
+	HWND WindowHandle;
+};
+
 bool CRawInput::initialize(WCHAR* pwszError)
 {
 	if (!initWindow(pwszError))
@@ -68,6 +77,35 @@ bool CRawInput::initialize(WCHAR* pwszError)
 
 bool CRawInput::initWindow(WCHAR* pwszError)
 {
+	// Identify the window that matches the injected process
+	if (!hwndClient)
+		hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
+
+	if (hwndClient)
+	{
+		// TF2 Window must be active for backpack fixes to work
+		if (n_sourceEXE == 2 && GetForegroundWindow() != hwndClient)
+		{
+			CRawInput::TF2unblock = true;
+			BlockInput(TRUE);
+			ShowWindow(hwndClient, 1);
+		}
+
+		// Set screen center until SetCursorPos is called
+		if (CRawInput::clientCenter())
+		{
+			CRawInput::hold_x = CRawInput::centerPoint.x;
+			CRawInput::hold_y = CRawInput::centerPoint.y;
+		}
+
+		// Unblock TF2 input after making it foreground
+		if (CRawInput::TF2unblock)
+		{
+			Sleep(1000);
+			BlockInput(FALSE);
+		}
+	}
+
 	// Register the window to catch WM_INPUT events
 	WNDCLASSEX wcex;
 	memset(&wcex, 0, sizeof(WNDCLASSEX));
@@ -98,20 +136,6 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 
 bool CRawInput::initInput(WCHAR* pwszError)
 {
-	// Identify when the active window matches the injected process
-	for (size_t p = 0; !CRawInput::hwndClient; ++p)
-	{
-		if (!CRawInput::clientWindow())
-			Sleep(300);
-	}
-
-	// Set screen center until SetCursorPos is called
-	if (CRawInput::clientCenter())
-	{
-		CRawInput::hold_x = CRawInput::centerPoint.x;
-		CRawInput::hold_y =  CRawInput::centerPoint.y;
-	}
-
 	POINT defCor;
 
 	// Raw input accumulators initialized to starting cursor position
@@ -143,33 +167,38 @@ bool CRawInput::initInput(WCHAR* pwszError)
 	return (bRegistered = true);
 }
 
-bool CRawInput::clientWindow()
+BOOL CALLBACK CRawInput::EnumWindowsProc(HWND WindowHandle, LPARAM lParam)
 {
-	DWORD ActiveWinID;
-	HWND hwndActiveWin = GetForegroundWindow();
-	GetWindowThreadProcessId(hwndActiveWin, &ActiveWinID);
+	unsigned long PID = 0;
+	WindowHandleStructure* data = reinterpret_cast<WindowHandleStructure*>(lParam);
+	GetWindowThreadProcessId(WindowHandle, &PID);
 
-	if (ActiveWinID == GetCurrentProcessId())
-	{
-		CRawInput::hwndClient = hwndActiveWin;
-		return true;
-	}
+	if (data->PID != PID || (GetWindow(WindowHandle, GW_OWNER) || !IsWindowVisible(WindowHandle)))
+		return TRUE;
 
-	return false;
+	data->WindowHandle = WindowHandle;
+	return FALSE;
+}
+
+HWND CRawInput::clientWindow(unsigned long PID)
+{
+	WindowHandleStructure data = {PID, NULL};
+	EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&data));
+	return data.WindowHandle;
 }
 
 bool CRawInput::clientCenter()
 {
 	RECT rectClient;
 
-	if (GetClientRect(CRawInput::hwndClient, &rectClient))
+	if (GetClientRect(hwndClient, &rectClient))
 	{
 		long xClient = rectClient.right / 2;
 		long yClient = rectClient.bottom / 2;
 		centerPoint.x = xClient;
 		centerPoint.y = yClient;
 
-		if (ClientToScreen(CRawInput::hwndClient, &centerPoint))
+		if (ClientToScreen(hwndClient, &centerPoint))
 			return true;
 	}
 	
@@ -202,8 +231,12 @@ LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPA
 
 					if (!rwInput->header.dwType)
 					{
+						EnterCriticalSection(&rawMouseData);
+
 						CRawInput::x += rwInput->data.mouse.lLastX;
 						CRawInput::y += rwInput->data.mouse.lLastY;
+
+						LeaveCriticalSection(&rawMouseData);
 					}
 				}
 
@@ -237,7 +270,7 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 				++CRawInput::signal;
 
 			// Bug fix for Steam overlay in TF2 backpack
-			if (((consec_EndScene == 6) && (CRawInput::consecG == 3)) && !CRawInput::alttab)
+			if ((consec_EndScene == 6 && CRawInput::consecG == 3) && !CRawInput::alttab)
 			{
 				if (CRawInput::SCP == 0)
 					CRawInput::SCP = -1;
@@ -252,7 +285,7 @@ skipGreset:
 		++CRawInput::SCP;
 
 		// Alt-tab bug fix
-		if ((CRawInput::set_x == 0) && (CRawInput::set_y == 0))
+		if (CRawInput::set_x == 0 && CRawInput::set_y == 0)
 			CRawInput::alttab = true;
 
 		// Console and buy menu bug fixes
@@ -265,12 +298,6 @@ skipGreset:
 		{
 			if (n_sourceEXE != 2)
 				CRawInput::SCP = 0;
-			else if (CRawInput::bSubclass)
-			{
-				// TF2 backpack fix not applied when in actual game
-				RemoveWindowSubclass(CRawInput::hwndClient, CRawInput::SubclassWndProc, 0);
-				CRawInput::bSubclass = false;
-			}
 
 			consec_EndScene = 0;
 
@@ -286,16 +313,26 @@ skipGreset:
 
 int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
+	EnterCriticalSection(&rawMouseData);
+
 	// Split off raw input handling to accumulate independently
 	CRawInput::set_x += CRawInput::x;
-	CRawInput::x = 0;
 	CRawInput::set_y += CRawInput::y;
+	CRawInput::x = 0;
 	CRawInput::y = 0;
+
+	LeaveCriticalSection(&rawMouseData);
 
 	if (n_sourceEXE == 2)
 	{
 		if (CRawInput::signal >= 1)
 			++CRawInput::signal;
+		else if (CRawInput::bSubclass)
+		{
+			// TF2 backpack fix not applied when in actual game
+			RemoveWindowSubclass(hwndClient, CRawInput::SubclassWndProc, 0);
+			CRawInput::bSubclass = false;
+		}
 
 		if (CRawInput::consecG < 3)
 			++CRawInput::consecG;
@@ -316,16 +353,15 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 			// Fix for subtle TF2 backpack bug from alt-tabbing
 			if (!CRawInput::bSubclass)
 			{
-				if (!CRawInput::hwndClient)
-				{
-					if (!CRawInput::clientWindow())
-						goto subclass_failed;
-				}
+				if (!hwndClient)
+					hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
 
-				// When in TF2 backpack, monitor its window messages
-				SetWindowSubclass(CRawInput::hwndClient, CRawInput::SubclassWndProc, 0, 1);
-subclass_failed:
-				CRawInput::bSubclass = true;
+				if (hwndClient)
+				{
+					// When in TF2 backpack, monitor its window messages
+					SetWindowSubclass(hwndClient, CRawInput::SubclassWndProc, 0, 1);
+					CRawInput::bSubclass = true;
+				}
 			}
 		}
 	}
@@ -335,21 +371,20 @@ subclass_failed:
 		if (consec_EndScene == 6)
 		{
 			// Needed to not break backpack in TF2
-			if ((CRawInput::SCP != 1) && (CRawInput::consecG == 3))
-				goto skip_recenter;
-
-			// Buy and escape menu bug fixes
-			if (!CRawInput::hwndClient)
-				CRawInput::clientWindow();
-
-			if (CRawInput::hwndClient && CRawInput::clientCenter())
+			if (!(CRawInput::SCP != 1 && CRawInput::consecG == 3))
 			{
-				CRawInput::set_x = CRawInput::centerPoint.x;
-				CRawInput::set_y = CRawInput::centerPoint.y;
+				if (!hwndClient)
+					hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
+
+				// Buy and escape menu bug fixes
+				if (hwndClient && CRawInput::clientCenter())
+				{
+					CRawInput::set_x = CRawInput::centerPoint.x;
+					CRawInput::set_y = CRawInput::centerPoint.y;
+				}
 			}
 		}
 
-skip_recenter:
 		lpPoint->x = CRawInput::set_x;
 		lpPoint->y = CRawInput::set_y;
 	}
@@ -390,8 +425,8 @@ void CRawInput::blockInput()
 {
 	BlockInput(TRUE);
 
-	// Unblock input after 7 SetCursorPos and/or GetCursorPos calls
-	for (size_t q = 0; CRawInput::signal < 8; ++q)
+	// Unblock input after 8 SetCursorPos and/or GetCursorPos calls
+	for (size_t q = 0; CRawInput::signal < 9; ++q)
 		Sleep(16);
 
 	CRawInput::signal = 0;
@@ -406,11 +441,15 @@ bool CRawInput::hookLibrary(bool bInstall)
 	{
 		if (!DetourFunctionWithTrampoline((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos) || !DetourFunctionWithTrampoline((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos))
 			return false;
+
+		InitializeCriticalSection(&rawMouseData);
 	}
 	else 
 	{
 		DetourRemove((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos);
 		DetourRemove((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos);
+
+		DeleteCriticalSection(&rawMouseData);
 	}
 
 	return true;

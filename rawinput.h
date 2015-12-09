@@ -11,6 +11,7 @@
 // Prevent warning level 4 warnings for detouring
 #pragma warning(disable: 4100)
 
+extern HWND hwndClient;
 extern void displayError(WCHAR* pwszError);
 extern bool sourceEXE;
 extern int n_sourceEXE;
@@ -32,7 +33,8 @@ public:
 	static bool initWindow(WCHAR* pwszError);
 	static bool initInput(WCHAR* pwszError);
 	// Identify window of the injected process
-	static bool clientWindow();
+	static BOOL CALLBACK EnumWindowsProc(HWND WindowHandle, LPARAM lParam);
+	static HWND clientWindow(unsigned long PID);
 	// Find window center of the injected process
 	static bool clientCenter();
 	// Poll input
@@ -53,7 +55,7 @@ public:
 
 private:
 	static HWND hwndInput;
-	static HWND hwndClient;
+	static bool TF2unblock;
 	static long hold_x;
 	static long hold_y;
 	static long set_x;
