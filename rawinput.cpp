@@ -77,7 +77,6 @@ bool CRawInput::initialize(WCHAR* pwszError)
 
 bool CRawInput::initWindow(WCHAR* pwszError)
 {
-	// Identify the window that matches the injected process
 	if (!hwndClient)
 		hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
 
@@ -173,7 +172,7 @@ BOOL CALLBACK CRawInput::EnumWindowsProc(HWND WindowHandle, LPARAM lParam)
 	WindowHandleStructure* data = reinterpret_cast<WindowHandleStructure*>(lParam);
 	GetWindowThreadProcessId(WindowHandle, &PID);
 
-	if (data->PID != PID || (GetWindow(WindowHandle, GW_OWNER) || !IsWindowVisible(WindowHandle)))
+	if (data->PID != PID || GetWindow(WindowHandle, GW_OWNER) || !IsWindowVisible(WindowHandle))
 		return TRUE;
 
 	data->WindowHandle = WindowHandle;
@@ -270,7 +269,7 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 				++CRawInput::signal;
 
 			// Bug fix for Steam overlay in TF2 backpack
-			if ((consec_EndScene == 6 && CRawInput::consecG == 3) && !CRawInput::alttab)
+			if (consec_EndScene == 6 && CRawInput::consecG == 3 && !CRawInput::alttab)
 			{
 				if (CRawInput::SCP == 0)
 					CRawInput::SCP = -1;

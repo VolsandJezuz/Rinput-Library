@@ -102,6 +102,7 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 				else
 					n_sourceEXE = 4;
 
+				// Identify the window that matches the injected process
 				hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
 
 				// Start CS:GO and TF2 D3D9 hooking

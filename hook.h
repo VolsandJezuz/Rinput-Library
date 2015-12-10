@@ -37,7 +37,7 @@ public:
 	{
 		if (bHooked)
 		{
-			if ((funcIn == func) && (hookFunc != hookFuncIn))
+			if (funcIn == func && hookFunc != hookFuncIn)
 			{
 				hookFunc = hookFuncIn;
 
@@ -137,11 +137,5 @@ public:
 		bHooked = false;
 	}
 };
-
-inline FARPROC GetVTable(LPVOID ptr, UINT funcOffset)
-{
-	UPARAM *vtable = *(UPARAM**)ptr;
-	return (FARPROC)(*(vtable+funcOffset));
-}
 
 #endif

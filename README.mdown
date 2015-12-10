@@ -19,8 +19,8 @@ Compiled with Visual Studio 2008, though you may be able to get it to work with 
 - Add the Microsoft SDK (I used v6.0A that came with VS2008/VC++2008) folders as additional Include directory and additional linker library directory
 - Add the Microsoft DirectX SDK (https://www.microsoft.com/en-us/download/confirmation.aspx?id=6812) folders as additional Include directory and additional linker library directory (the x86 folder)
 - Compiled with Multi-threaded DLL runtime library for linking
-- It may be necessary to set Enable C++ Exceptions to Yes (/EHsc), as it didn't seem to want to compile properly in set to No
-- Set Calling Convention __cdecl (/Gd), as it seems to be the only one that performs well and allow D3D9 to be hooked
+- Set Enable C++ Exceptions to Yes (/EHsc), as several of the included standard C++ headers use exception handlers
+- Set Calling Convention __cdecl (/Gd), as it seems to be the only one that performs well and allows D3D9 to be hooked
 - Set the Entry Point as DllMain
 - Add shlwapi.lib, dxguid.lib, psapi.lib, and comctl32.lib as an Additional Dependency in the Linker options
 - Use x86 architecture for compiling (i.e., RInput does not support x64 applications)
@@ -28,7 +28,6 @@ Compiled with Visual Studio 2008, though you may be able to get it to work with 
 
 ## How it works
 Summary of the process by the original author:
-
 1. The library gets injected into a process by an injector
 2. The injector creates a windows event to communicate with the injected library
 3. The injector calls the "entryPoint" function remotely
@@ -36,8 +35,8 @@ Summary of the process by the original author:
 5. The library raises the event that has been created by the injector
 6. The injector gives the user feedback, based on whether the event was raised or not
 
-## Credits:
+## Credits
 - BuSheeZy - helping me understand Visual C++ IDE and Git
 - qsxcv - ideas for how to improve the mouse data handling and information about how mouse input works
-- about - original author
+- abort - original author
 - Dr3am - for the icons
