@@ -12,24 +12,27 @@
 
 HWND hwndSender = NULL;
 static bool bD3D9Hooked = false;
-HANDLE dummyEvent = NULL;
+static HANDLE dummyEvent = NULL;
 CRITICAL_SECTION d3d9EndMutex;
 
-inline bool AttemptToHookSomething()
+static inline bool AttemptToHookSomething()
 {
-	if (!hwndSender)
-		return false;
-
 	bool bFoundSomethingToHook = false;
 
+	// Creates D3D9Ex device for invisible dummy window
 	if (!bD3D9Hooked && InitD3D9Capture())
 	{
+		// InitD3D9Capture returned true, so D3D hooking was successful
 		bFoundSomethingToHook = true;
-
 		bD3D9Hooked = true;
+
+		// Dummy window no longer need, so its resources can be freed
+		if (dummyEvent)
+			CloseHandle(dummyEvent);
+
+		if (hwndSender)
+			DestroyWindow(hwndSender);
 	}
-	else
-		CheckD3D9Capture();
 	
 	return bFoundSomethingToHook;
 }
@@ -39,6 +42,7 @@ static inline HWND CreateDummyWindow(LPCTSTR lpClass, LPCTSTR lpName)
 	return CreateWindowEx(0, lpClass, lpName, WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 0, 0, 1, 1, NULL, NULL, g_hInstance, NULL);
 }
 
+// Creates an invisible window and process its messages
 static DWORD WINAPI DummyWindowThread(LPVOID lpBla)
 {
 	WNDCLASS wc;
@@ -69,6 +73,7 @@ static DWORD WINAPI DummyWindowThread(LPVOID lpBla)
 	return 0;
 }
 
+// Starting point for D3D hooking
 DWORD WINAPI CaptureThread(HANDLE hDllMainThread)
 {
 	bool bSuccess = false;
@@ -91,20 +96,10 @@ DWORD WINAPI CaptureThread(HANDLE hDllMainThread)
 
 	CloseHandle(hWindowThread);
 
+	// Loop to attempt D3D hooking until it is successful
 	while(!AttemptToHookSomething())
 		Sleep(50);
 
-	for (size_t n = 0; !bCaptureThreadStop; ++n)
-	{
-		// Less frequent loop interations reduce resource usage
-		if (n % 16 == 0)
-			AttemptToHookSomething();
-
-		// Overall interval for checking EndScene hook is still 4000ms
-		Sleep(250);
-	}
-
-	DeleteCriticalSection(&d3d9EndMutex);
-
-	return 0;
+	CloseHandle(hCaptureThread);
+	return 1;
 }

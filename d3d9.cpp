@@ -16,13 +16,25 @@ HookData d3d9EndScene;
 
 static LPVOID lpCurrentDevice = NULL;
 int consec_EndScene = 0;
-HMODULE hD3D9Dll = NULL;
+static HMODULE hD3D9Dll = NULL;
 
 typedef HRESULT(STDMETHODCALLTYPE *D3D9EndScenePROC)(IDirect3DDevice9 *device);
 
 HRESULT STDMETHODCALLTYPE D3D9EndScene(IDirect3DDevice9 *device)
 {
-	EnterCriticalSection(&d3d9EndMutex);
+	HRESULT hRes = E_FAIL;
+
+	// Make sure CRITICAL_SECTION is not referenced after deletion
+	if (hUnloadDLLFunc)
+		return hRes;
+
+	while(!TryEnterCriticalSection(&d3d9EndMutex))
+	{
+		Sleep(16);
+
+		if (hUnloadDLLFunc)
+			return hRes;
+	}
 
 	d3d9EndScene.Unhook();
 
@@ -36,7 +48,7 @@ HRESULT STDMETHODCALLTYPE D3D9EndScene(IDirect3DDevice9 *device)
 		lpCurrentDevice = device;
 	}
 
-	HRESULT hRes = device->EndScene();
+	hRes = device->EndScene();
 
 	// Consecutive EndScene calls without Get/SetCursorPos pair
 	if (consec_EndScene < 6)
@@ -52,11 +64,12 @@ HRESULT STDMETHODCALLTYPE D3D9EndScene(IDirect3DDevice9 *device)
 typedef IDirect3D9* (WINAPI*D3D9CREATEPROC)(UINT);
 typedef HRESULT (WINAPI*D3D9CREATEEXPROC)(UINT, IDirect3D9Ex**);
 
-// Figure out the D3D9 device and hook EndScene
+// Figure out the D3D9 device address and hook EndScene
 bool InitD3D9Capture()
 {
 	bool bSuccess = false;
 
+	// Get full path for the D3D9 DLL
 	wchar_t lpD3D9Path[MAX_PATH];
 	SHGetFolderPathW(NULL, CSIDL_SYSTEM, NULL, SHGFP_TYPE_CURRENT, lpD3D9Path);
 	size_t size = 11;
@@ -65,6 +78,7 @@ bool InitD3D9Capture()
 	wcscat_s(lpD3D9Path, MAX_PATH, wa);
 	delete[] wa;
 
+	// Start creation of D3D9Ex device in dummy window
 	if (hD3D9Dll = GetModuleHandleW(lpD3D9Path))
 	{
 		D3D9CREATEEXPROC d3d9CreateEx = (D3D9CREATEEXPROC)GetProcAddress(hD3D9Dll, "Direct3DCreate9Ex");
@@ -90,10 +104,13 @@ bool InitD3D9Capture()
 
 				if (SUCCEEDED(hRes = d3d9ex->CreateDeviceEx(D3DADAPTER_DEFAULT, D3DDEVTYPE_NULLREF, hwndSender, D3DCREATE_HARDWARE_VERTEXPROCESSING|D3DCREATE_NOWINDOWCHANGES, &pp, NULL, &deviceEx)))
 				{
+					// D3D9Ex device made successfully in dummy window
 					bSuccess = true;
 
+					// D3D9Ex device address is the D3D9 vTable address
 					UPARAM *vtable = *(UPARAM**)deviceEx;
 
+					// EndScene address is a fixed offset in vTable
 					d3d9EndScene.Hook((FARPROC)*(vtable+(168/4)), (FARPROC)D3D9EndScene);
 					
 					deviceEx->Release();
@@ -109,11 +126,16 @@ bool InitD3D9Capture()
 	return bSuccess;
 }
 
-void CheckD3D9Capture()
+// Releases remaining resources and frees the RInput DLL
+DWORD WINAPI UnloadDLLFunc(LPVOID lpParameter)
 {
 	EnterCriticalSection(&d3d9EndMutex);
 
-	d3d9EndScene.Rehook(true);
+	d3d9EndScene.Unhook();
 
-	LeaveCriticalSection(&d3d9EndMutex);
+	DeleteCriticalSection(&d3d9EndMutex);
+
+	CloseHandle(hUnloadDLLFunc);
+	FreeLibraryAndExitThread(g_hInstance, 0);
+	return 1;
 }

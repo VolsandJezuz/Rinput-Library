@@ -14,7 +14,7 @@
 
 // Raw input class
 #include "rawinput.h"
-// D3D9 hooking class
+// D3D hooking class
 #include "hook.h"
 
 extern "C" __declspec(dllexport) void entryPoint();

@@ -10,16 +10,17 @@
 
 extern HINSTANCE g_hInstance;
 extern CRITICAL_SECTION d3d9EndMutex;
-extern HANDLE dummyEvent;
 extern HWND hwndSender;
-extern bool bCaptureThreadStop;
+extern HANDLE hCaptureThread;
+extern HANDLE hUnloadDLLFunc;
 
 bool InitD3D9Capture();
 DWORD WINAPI CaptureThread(HANDLE hDllMainThread);
-void CheckD3D9Capture();
+DWORD WINAPI UnloadDLLFunc(LPVOID lpParameter);
 
 typedef unsigned long UPARAM;
 
+// Class to handle all hooking, rehooking, and unhooking
 class HookData
 {
 	BYTE data[14];

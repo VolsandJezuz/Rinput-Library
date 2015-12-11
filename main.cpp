@@ -37,7 +37,7 @@ int n_sourceEXE = 0;
 bool sourceEXE = false;
 HWND hwndClient = NULL;
 HANDLE hCaptureThread = NULL;
-bool bCaptureThreadStop = false;
+HANDLE hUnloadDLLFunc = NULL;
 
 int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 {
@@ -111,32 +111,32 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 					HANDLE hDllMainThread = OpenThread(THREAD_ALL_ACCESS, NULL, GetCurrentThreadId());
 
 					if (!(hCaptureThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, (LPVOID)hDllMainThread, 0, 0)))
-					{
 						CloseHandle(hDllMainThread);
-						return 0;
-					}
 				}
 
 				break;
 			}
 
 		case DLL_PROCESS_DETACH:
-			// Stop CS:GO and TF2 D3D9 hooking
-			if (n_sourceEXE <= 2)
 			{
-				bCaptureThreadStop = true;
-				WaitForSingleObject(hCaptureThread, 300);
+				// Stop CS:GO and TF2 D3D9 hooking
+				CRawInput::hookLibrary(false);
+				CRawInput::unload();
 
-				if (dummyEvent)
-					CloseHandle(dummyEvent);
+				if (n_sourceEXE <= 2 && !(hUnloadDLLFunc = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)UnloadDLLFunc, NULL, 0, 0)))
+				{
+					// Revert to freeing DLL by returning DllMain
+					hUnloadDLLFunc = hInstance;
 
-				if (hwndSender)
-					DestroyWindow(hwndSender);
+					EnterCriticalSection(&d3d9EndMutex);
+					DeleteCriticalSection(&d3d9EndMutex);
+				}
+				// Free DLL with UnloadDLLFunc, not letting DllMain return
+				else
+					WaitForSingleObject(hUnloadDLLFunc, INFINITE);
+
+				break;
 			}
-
-			CRawInput::hookLibrary(false);
-			CRawInput::unload();
-			break;
 	}
 
 	return 1;

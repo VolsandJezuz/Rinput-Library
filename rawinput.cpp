@@ -55,7 +55,7 @@ int CRawInput::SCP = 0;
 bool CRawInput::bSubclass = false;
 HANDLE CRawInput::hCreateThread = NULL;
 
-// Fixed rare packet discrepancy
+// Fixes rare packet discrepancy due to a collion
 CRITICAL_SECTION rawMouseData;
 
 struct WindowHandleStructure
@@ -129,7 +129,6 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 
 	// Unregister the window class
 	UnregisterClass(INPUTWINDOW, NULL);
-
 	return true;
 }
 
@@ -175,6 +174,7 @@ BOOL CALLBACK CRawInput::EnumWindowsProc(HWND WindowHandle, LPARAM lParam)
 	if (data->PID != PID || GetWindow(WindowHandle, GW_OWNER) || !IsWindowVisible(WindowHandle))
 		return TRUE;
 
+	// Found visible, main program window matching current process ID
 	data->WindowHandle = WindowHandle;
 	return FALSE;
 }
@@ -192,12 +192,14 @@ bool CRawInput::clientCenter()
 
 	if (GetClientRect(hwndClient, &rectClient))
 	{
+		// Calculated relative window center
 		long xClient = rectClient.right / 2;
 		long yClient = rectClient.bottom / 2;
 		centerPoint.x = xClient;
 		centerPoint.y = yClient;
 
 		if (ClientToScreen(hwndClient, &centerPoint))
+			// Translated relative window center to resolution coords
 			return true;
 	}
 	
@@ -230,8 +232,10 @@ LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPA
 
 					if (!rwInput->header.dwType)
 					{
+						// Avoid collisions with hGetCursorPos
 						EnterCriticalSection(&rawMouseData);
 
+						// Accumulate cursor pos change from raw packets
 						CRawInput::x += rwInput->data.mouse.lLastX;
 						CRawInput::y += rwInput->data.mouse.lLastY;
 
@@ -312,6 +316,7 @@ skipGreset:
 
 int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
+	// Avoid collisions with accumulation of raw input packets
 	EnterCriticalSection(&rawMouseData);
 
 	// Split off raw input handling to accumulate independently
@@ -395,7 +400,6 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	}
 
 	CRawInput::SCP = 0;
-
 	return 0;
 }
 
@@ -420,7 +424,7 @@ LRESULT CALLBACK CRawInput::SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 	return DefSubclassProc(hWnd, uMsg, wParam, lParam);
 }
 
-void CRawInput::blockInput()
+DWORD WINAPI CRawInput::blockInput(LPVOID lpParameter)
 {
 	BlockInput(TRUE);
 
@@ -431,7 +435,9 @@ void CRawInput::blockInput()
 	CRawInput::signal = 0;
 
 	BlockInput(FALSE);
+	
 	CloseHandle(CRawInput::hCreateThread);
+	return 1;
 }
 
 bool CRawInput::hookLibrary(bool bInstall)
