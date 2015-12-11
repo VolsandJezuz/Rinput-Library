@@ -131,6 +131,8 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 					EnterCriticalSection(&d3d9EndMutex);
 					DeleteCriticalSection(&d3d9EndMutex);
 				}
+				else if (n_sourceEXE > 2)
+					hUnloadDLLFunc = hInstance;
 				// Free DLL with UnloadDLLFunc, not letting DllMain return
 				else
 					WaitForSingleObject(hUnloadDLLFunc, INFINITE);
