@@ -1,6 +1,7 @@
 /********************************************************************************
  hook.h, hook.cpp, and d3d9.cpp contain the code for fixing the bugs in
- the CS:GO buy and escape menus, and are only called for CS:GO.
+ the CS:GO buy and escape menus, and for fixing the bugs in the TF2 MVM
+ Upgrade Station menu and some of the bugs in TF2's backpack.
 
  Copyright (C) 2012 Hugh Bailey <obs.jim@gmail.com>
 
@@ -11,18 +12,17 @@
 #include "hook.h"
 
 HWND hwndSender = NULL;
-static bool bD3D9Hooked = false;
+bool bD3D9Hooked = false;
 static HANDLE dummyEvent = NULL;
-CRITICAL_SECTION d3d9EndMutex;
 
-static inline bool AttemptToHookSomething()
+inline bool AttemptToHookSomething()
 {
 	bool bFoundSomethingToHook = false;
 
 	// Creates D3D9Ex device for invisible dummy window
 	if (!bD3D9Hooked && InitD3D9Capture())
 	{
-		// InitD3D9Capture returned true, so D3D hooking was successful
+		// InitD3D9Capture returned true, so D3D9 hooking was successful
 		bFoundSomethingToHook = true;
 		bD3D9Hooked = true;
 
@@ -37,7 +37,7 @@ static inline bool AttemptToHookSomething()
 	return bFoundSomethingToHook;
 }
 
-static inline HWND CreateDummyWindow(LPCTSTR lpClass, LPCTSTR lpName)
+inline HWND CreateDummyWindow(LPCTSTR lpClass, LPCTSTR lpName)
 {
 	return CreateWindowEx(0, lpClass, lpName, WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 0, 0, 1, 1, NULL, NULL, g_hInstance, NULL);
 }
@@ -85,8 +85,6 @@ DWORD WINAPI CaptureThread(HANDLE hDllMainThread)
 	}
 
 	dummyEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-
-	InitializeCriticalSection(&d3d9EndMutex);
 
 	DWORD bla;
 	HANDLE hWindowThread = CreateThread(NULL, 0, DummyWindowThread, NULL, 0, &bla);

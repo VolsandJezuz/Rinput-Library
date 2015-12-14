@@ -12,10 +12,8 @@
 #pragma warning(disable: 4100)
 
 extern HWND hwndClient;
-extern void displayError(WCHAR* pwszError);
 extern bool sourceEXE;
 extern int n_sourceEXE;
-extern int consec_EndScene;
 
 /**
  * Note from original author (abort):

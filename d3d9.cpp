@@ -1,6 +1,7 @@
 /********************************************************************************
  hook.h, hook.cpp, and d3d9.cpp contain the code for fixing the bugs in
- the CS:GO buy and escape menus, and are only called for CS:GO.
+ the CS:GO buy and escape menus, and for fixing the bugs in the TF2 MVM
+ Upgrade Station menu and some of the bugs in TF2's backpack.
 
  Copyright (C) 2012 Hugh Bailey <obs.jim@gmail.com>
 
@@ -14,9 +15,7 @@
 
 HookData d3d9EndScene;
 
-static LPVOID lpCurrentDevice = NULL;
-int consec_EndScene = 0;
-static HMODULE hD3D9Dll = NULL;
+CRITICAL_SECTION d3d9EndMutex;
 
 typedef HRESULT(STDMETHODCALLTYPE *D3D9EndScenePROC)(IDirect3DDevice9 *device);
 
@@ -30,23 +29,13 @@ HRESULT STDMETHODCALLTYPE D3D9EndScene(IDirect3DDevice9 *device)
 
 	while(!TryEnterCriticalSection(&d3d9EndMutex))
 	{
-		Sleep(16);
+		Sleep(0);
 
 		if (hUnloadDLLFunc)
 			return hRes;
 	}
 
 	d3d9EndScene.Unhook();
-
-	if(lpCurrentDevice == NULL)
-	{
-		IDirect3D9 *d3d;
-
-		if(SUCCEEDED(device->GetDirect3D(&d3d)))
-			d3d->Release();
-
-		lpCurrentDevice = device;
-	}
 
 	hRes = device->EndScene();
 
@@ -77,6 +66,8 @@ bool InitD3D9Capture()
 	mbstowcs_s(&size, wa, 11, TEXT("\\d3d9.dll"), 11);
 	wcscat_s(lpD3D9Path, MAX_PATH, wa);
 	delete[] wa;
+
+	HMODULE hD3D9Dll = NULL;
 
 	// Start creation of D3D9Ex device in dummy window
 	if (hD3D9Dll = GetModuleHandleW(lpD3D9Path))
@@ -110,6 +101,8 @@ bool InitD3D9Capture()
 					// D3D9Ex device address is the D3D9 vTable address
 					UPARAM *vtable = *(UPARAM**)deviceEx;
 
+					InitializeCriticalSection(&d3d9EndMutex);
+
 					// EndScene address is a fixed offset in vTable
 					d3d9EndScene.Hook((FARPROC)*(vtable+(168/4)), (FARPROC)D3D9EndScene);
 					
@@ -129,11 +122,14 @@ bool InitD3D9Capture()
 // Releases remaining resources and frees the RInput DLL
 DWORD WINAPI UnloadDLLFunc(LPVOID lpParameter)
 {
-	EnterCriticalSection(&d3d9EndMutex);
+	if (bD3D9Hooked)
+	{
+		EnterCriticalSection(&d3d9EndMutex);
 
-	d3d9EndScene.Unhook();
+		d3d9EndScene.Unhook();
 
-	DeleteCriticalSection(&d3d9EndMutex);
+		DeleteCriticalSection(&d3d9EndMutex);
+	}
 
 	CloseHandle(hUnloadDLLFunc);
 	FreeLibraryAndExitThread(g_hInstance, 0);

@@ -39,6 +39,9 @@ HWND hwndClient = NULL;
 HANDLE hCaptureThread = NULL;
 HANDLE hUnloadDLLFunc = NULL;
 
+void displayError(WCHAR* pwszError);
+inline bool validateVersion();
+
 int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 {
 	UNREFERENCED_PARAMETER(lpReserved);
@@ -172,24 +175,7 @@ extern "C" __declspec(dllexport) void entryPoint()
 		displayError(L"Failed to poll mouse input");
 }
 
-// Validate that we are working with at least Windows XP
-inline bool validateVersion()
-{
-	DWORD dwVersion = GetVersion();
-	double fCompareVersion = LOBYTE(LOWORD(dwVersion)) + 0.1 * HIBYTE(LOWORD(dwVersion));
-	return (dwVersion && fCompareVersion >= 5.1);
-}
-
-void displayError(WCHAR* pwszError)
-{
-	MessageBoxW(NULL, pwszError, L"Raw Input error!", MB_ICONERROR | MB_OK);
-
-	CRawInput::hookLibrary(false);
-
-	unloadLibrary();
-}
-
-void unloadLibrary()
+static void unloadLibrary()
 {
 	__asm
 	{
@@ -201,4 +187,19 @@ void unloadLibrary()
 		mov eax, FreeLibrary
 		jmp eax
 	}
+}
+
+void displayError(WCHAR* pwszError)
+{
+	MessageBoxW(NULL, pwszError, L"Raw Input error!", MB_ICONERROR | MB_OK);
+	CRawInput::hookLibrary(false);
+	unloadLibrary();
+}
+
+// Validate that we are working with at least Windows XP
+inline bool validateVersion()
+{
+	DWORD dwVersion = GetVersion();
+	double fCompareVersion = LOBYTE(LOWORD(dwVersion)) + 0.1 * HIBYTE(LOWORD(dwVersion));
+	return (dwVersion && fCompareVersion >= 5.1);
 }

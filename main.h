@@ -19,9 +19,4 @@
 
 extern "C" __declspec(dllexport) void entryPoint();
 
-void displayError(WCHAR* pwszError);
-void unloadLibrary();
-
-inline bool validateVersion();
-
 #endif

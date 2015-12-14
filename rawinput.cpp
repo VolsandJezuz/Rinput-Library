@@ -55,8 +55,8 @@ int CRawInput::SCP = 0;
 bool CRawInput::bSubclass = false;
 HANDLE CRawInput::hCreateThread = NULL;
 
-// Fixes rare packet discrepancy due to a collion
 CRITICAL_SECTION rawMouseData;
+int consec_EndScene = 0;
 
 struct WindowHandleStructure
 {

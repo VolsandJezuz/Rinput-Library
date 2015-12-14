@@ -10,8 +10,10 @@
 
 extern HINSTANCE g_hInstance;
 extern CRITICAL_SECTION d3d9EndMutex;
+extern bool bD3D9Hooked;
 extern HWND hwndSender;
 extern HANDLE hCaptureThread;
+extern int consec_EndScene;
 extern HANDLE hUnloadDLLFunc;
 
 bool InitD3D9Capture();
