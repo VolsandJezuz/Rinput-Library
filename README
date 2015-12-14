@@ -4,8 +4,8 @@ RInput is an alternative to in-game raw input, which some users perceive as havi
 
 Requirements
 --------------------------------------
+- OS: Windows XP or later
 - CPU: Intel Pentium 4 or later; or, AMD Opteron, Athlon 64 or later
-- OS: Windows XP or later (Windows 7 or later for all the bug fixes to work if using DirectX 8 in TF2, i.e. -dxlevel 80 or 81)
 - Microsoft Visual C++ 2008 Redistributable - x86 9.0.21022.218 or later (included in RInput release downloads starting with v1.34 but only needed if you get a pop-up error like "MSVCR90.dll is missing" when trying to run RInput)
 
 Note
