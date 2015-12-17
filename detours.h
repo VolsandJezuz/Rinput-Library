@@ -8,11 +8,8 @@
 //  Copyright 1995-2001, Microsoft Corporation
 //
 
-#pragma once
 #ifndef _DETOURS_H_
 #define _DETOURS_H_
-
-#pragma comment(lib, "detours.lib")
 
 //////////////////////////////////////////////////////////////////////////////
 //

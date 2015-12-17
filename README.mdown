@@ -22,7 +22,7 @@ Compiled with Visual Studio 2008, though you may be able to get it to work with 
 - Set Enable C++ Exceptions to Yes (/EHsc), as several of the included standard C++ headers use exception handlers
 - Set Calling Convention __cdecl (/Gd), as it seems to be the only one that performs well and allows D3D9 to be hooked
 - Set the Entry Point as DllMain
-- Add shlwapi.lib, dxguid.lib, psapi.lib, and comctl32.lib as an Additional Dependency in the Linker options
+- Add shlwapi.lib, dxguid.lib, psapi.lib, comctl32.lib, and detours.lib to the Additional Dependency list in the Linker options
 - Use x86 architecture for compiling (i.e., RInput does not support x64 applications)
 - MS Detours 1.5 header and library were acquired from http://home.comcast.net/~wiccaan/downloads/Detours.rar
 

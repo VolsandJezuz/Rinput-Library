@@ -34,29 +34,30 @@
 
 #pragma intrinsic(memset)
 
-// Define functions that are to be hooked and detoured
-extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpGetCursorPos(LPPOINT lpPoint), GetCursorPos);
-extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpSetCursorPos(int x, int y), SetCursorPos);
-
-HWND CRawInput::hwndInput = NULL;
+HWND CRawInput::hwndClient = NULL;
 bool CRawInput::TF2unblock = false;
 long CRawInput::hold_x = 0;
 long CRawInput::hold_y = 0;
+POINT CRawInput::centerPoint;
+HWND CRawInput::hwndInput = NULL;
 long CRawInput::set_x = 0;
 long CRawInput::set_y = 0;
 bool CRawInput::bRegistered = false;
-POINT CRawInput::centerPoint;
+CRITICAL_SECTION CRawInput::rawMouseData;
 long CRawInput::x = 0;
 long CRawInput::y = 0;
 int CRawInput::signal = 0;
+int consec_EndScene = 0;
 int CRawInput::consecG = 2;
 bool CRawInput::alttab = false;
 int CRawInput::SCP = 0;
 bool CRawInput::bSubclass = false;
 HANDLE CRawInput::hCreateThread = NULL;
+HANDLE hCaptureThread = NULL;
 
-CRITICAL_SECTION rawMouseData;
-int consec_EndScene = 0;
+// Define functions that are to be hooked and detoured
+extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpGetCursorPos(LPPOINT lpPoint), GetCursorPos);
+extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpSetCursorPos(int x, int y), SetCursorPos);
 
 struct WindowHandleStructure
 {
@@ -77,17 +78,17 @@ bool CRawInput::initialize(WCHAR* pwszError)
 
 bool CRawInput::initWindow(WCHAR* pwszError)
 {
-	if (!hwndClient)
-		hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
+	// Identify the window that matches the injected process
+	CRawInput::hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
 
-	if (hwndClient)
+	if (CRawInput::hwndClient)
 	{
 		// TF2 Window must be active for backpack fixes to work
-		if (n_sourceEXE == 2 && GetForegroundWindow() != hwndClient)
+		if (n_sourceEXE == 2 && GetForegroundWindow() != CRawInput::hwndClient)
 		{
 			CRawInput::TF2unblock = true;
 			BlockInput(TRUE);
-			ShowWindow(hwndClient, 1);
+			ShowWindow(CRawInput::hwndClient, 1);
 		}
 
 		// Set screen center until SetCursorPos is called
@@ -190,7 +191,7 @@ bool CRawInput::clientCenter()
 {
 	RECT rectClient;
 
-	if (GetClientRect(hwndClient, &rectClient))
+	if (GetClientRect(CRawInput::hwndClient, &rectClient))
 	{
 		// Calculated relative window center
 		long xClient = rectClient.right / 2;
@@ -198,7 +199,7 @@ bool CRawInput::clientCenter()
 		centerPoint.x = xClient;
 		centerPoint.y = yClient;
 
-		if (ClientToScreen(hwndClient, &centerPoint))
+		if (ClientToScreen(CRawInput::hwndClient, &centerPoint))
 			// Translated relative window center to resolution coords
 			return true;
 	}
@@ -233,13 +234,13 @@ LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPA
 					if (!rwInput->header.dwType)
 					{
 						// Avoid collisions with hGetCursorPos
-						EnterCriticalSection(&rawMouseData);
+						EnterCriticalSection(&CRawInput::rawMouseData);
 
 						// Accumulate cursor pos change from raw packets
 						CRawInput::x += rwInput->data.mouse.lLastX;
 						CRawInput::y += rwInput->data.mouse.lLastY;
 
-						LeaveCriticalSection(&rawMouseData);
+						LeaveCriticalSection(&CRawInput::rawMouseData);
 					}
 				}
 
@@ -317,7 +318,7 @@ skipGreset:
 int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
 	// Avoid collisions with accumulation of raw input packets
-	EnterCriticalSection(&rawMouseData);
+	EnterCriticalSection(&CRawInput::rawMouseData);
 
 	// Split off raw input handling to accumulate independently
 	CRawInput::set_x += CRawInput::x;
@@ -325,7 +326,7 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	CRawInput::x = 0;
 	CRawInput::y = 0;
 
-	LeaveCriticalSection(&rawMouseData);
+	LeaveCriticalSection(&CRawInput::rawMouseData);
 
 	if (n_sourceEXE == 2)
 	{
@@ -334,7 +335,7 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 		else if (CRawInput::bSubclass)
 		{
 			// TF2 backpack fix not applied when in actual game
-			RemoveWindowSubclass(hwndClient, CRawInput::SubclassWndProc, 0);
+			RemoveWindowSubclass(CRawInput::hwndClient, CRawInput::SubclassWndProc, 0);
 			CRawInput::bSubclass = false;
 		}
 
@@ -357,13 +358,13 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 			// Fix for subtle TF2 backpack bug from alt-tabbing
 			if (!CRawInput::bSubclass)
 			{
-				if (!hwndClient)
-					hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
+				if (!CRawInput::hwndClient)
+					CRawInput::hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
 
-				if (hwndClient)
+				if (CRawInput::hwndClient)
 				{
 					// When in TF2 backpack, monitor its window messages
-					SetWindowSubclass(hwndClient, CRawInput::SubclassWndProc, 0, 1);
+					SetWindowSubclass(CRawInput::hwndClient, CRawInput::SubclassWndProc, 0, 1);
 					CRawInput::bSubclass = true;
 				}
 			}
@@ -377,11 +378,11 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 			// Needed to not break backpack in TF2
 			if (!(CRawInput::SCP != 1 && CRawInput::consecG == 3))
 			{
-				if (!hwndClient)
-					hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
+				if (!CRawInput::hwndClient)
+					CRawInput::hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
 
 				// Buy and escape menu bug fixes
-				if (hwndClient && CRawInput::clientCenter())
+				if (CRawInput::hwndClient && CRawInput::clientCenter())
 				{
 					CRawInput::set_x = CRawInput::centerPoint.x;
 					CRawInput::set_y = CRawInput::centerPoint.y;
@@ -428,8 +429,8 @@ DWORD WINAPI CRawInput::blockInput(LPVOID lpParameter)
 {
 	BlockInput(TRUE);
 
-	// Unblock input after 8 SetCursorPos and/or GetCursorPos calls
-	for (size_t q = 0; CRawInput::signal < 9; ++q)
+	// Unblock input after 9 SetCursorPos and/or GetCursorPos calls
+	for (size_t q = 0; CRawInput::signal < 10; ++q)
 		Sleep(16);
 
 	CRawInput::signal = 0;
@@ -447,14 +448,18 @@ bool CRawInput::hookLibrary(bool bInstall)
 		if (!DetourFunctionWithTrampoline((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos) || !DetourFunctionWithTrampoline((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos))
 			return false;
 
-		InitializeCriticalSection(&rawMouseData);
+		InitializeCriticalSection(&CRawInput::rawMouseData);
+
+		// Start CS:GO and TF2 D3D9 hooking
+		if (n_sourceEXE <= 2)
+			hCaptureThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, NULL, 0, 0);
 	}
 	else 
 	{
 		DetourRemove((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos);
 		DetourRemove((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos);
 
-		DeleteCriticalSection(&rawMouseData);
+		DeleteCriticalSection(&CRawInput::rawMouseData);
 	}
 
 	return true;

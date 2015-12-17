@@ -1,19 +1,16 @@
 #ifndef RAWINPUT_H_
 #define RAWINPUT_H_
 
-#include <windows.h>
-#include "detours.h"
-
 #define RAWINPUTHDRSIZE sizeof(RAWINPUTHEADER)
 #define RAWPTRSIZE 40
 #define INPUTWINDOW "RInput"
 
-// Prevent warning level 4 warnings for detouring
-#pragma warning(disable: 4100)
+#include <windows.h>
+#include "detours.h"
 
-extern HWND hwndClient;
 extern bool sourceEXE;
 extern int n_sourceEXE;
+extern DWORD WINAPI CaptureThread(LPVOID lpParameter);
 
 /**
  * Note from original author (abort):
@@ -50,14 +47,16 @@ public:
 	static void unload();
 
 private:
-	static HWND hwndInput;
+	static HWND hwndClient;
 	static bool TF2unblock;
 	static long hold_x;
 	static long hold_y;
+	static POINT centerPoint;
+	static HWND hwndInput;
 	static long set_x;
 	static long set_y;
 	static bool bRegistered;
-	static POINT centerPoint;
+	static CRITICAL_SECTION rawMouseData;
 	static long x;
 	static long y;
 	static int signal;

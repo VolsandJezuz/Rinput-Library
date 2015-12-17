@@ -74,23 +74,17 @@ static DWORD WINAPI DummyWindowThread(LPVOID lpBla)
 }
 
 // Starting point for D3D hooking
-DWORD WINAPI CaptureThread(HANDLE hDllMainThread)
+DWORD WINAPI CaptureThread(LPVOID lpParameter)
 {
-	bool bSuccess = false;
-
-	if (hDllMainThread)
-	{
-		WaitForSingleObject(hDllMainThread, 150);
-		CloseHandle(hDllMainThread);
-	}
-
 	dummyEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-
 	DWORD bla;
-	HANDLE hWindowThread = CreateThread(NULL, 0, DummyWindowThread, NULL, 0, &bla);
+	HANDLE hWindowThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)DummyWindowThread, NULL, 0, &bla);
 
 	if (!hWindowThread)
+	{
+		CloseHandle(hCaptureThread);
 		return 0;
+	}
 
 	CloseHandle(hWindowThread);
 

@@ -35,27 +35,19 @@
 HINSTANCE g_hInstance = NULL;
 int n_sourceEXE = 0;
 bool sourceEXE = false;
-HWND hwndClient = NULL;
-HANDLE hCaptureThread = NULL;
 HANDLE hUnloadDLLFunc = NULL;
-
-void displayError(WCHAR* pwszError);
-inline bool validateVersion();
 
 int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 {
-	UNREFERENCED_PARAMETER(lpReserved);
-
 	switch(dwReason)
 	{
 		case DLL_PROCESS_ATTACH:
+			// No need for a threaded entry
+			if (!DisableThreadLibraryCalls(hInstance))
+				return 0;
+			else
 			{
-				// No need for a threaded entry
-				if (!DisableThreadLibraryCalls(hInstance))
-					return 0;
-
 				g_hInstance = hInstance;
-
 				char szEXEPath[MAX_PATH];
 
 				// Detect source games for enabling specific bug fixes
@@ -104,47 +96,74 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 				}
 				else
 					n_sourceEXE = 4;
-
-				// Identify the window that matches the injected process
-				hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
-
-				// Start CS:GO and TF2 D3D9 hooking
-				if (n_sourceEXE <= 2)
-				{
-					HANDLE hDllMainThread = OpenThread(THREAD_ALL_ACCESS, NULL, GetCurrentThreadId());
-
-					if (!(hCaptureThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, (LPVOID)hDllMainThread, 0, 0)))
-						CloseHandle(hDllMainThread);
-				}
-
-				break;
 			}
+
+			break;
 
 		case DLL_PROCESS_DETACH:
+			// Stop CS:GO and TF2 D3D9 hooking
+			CRawInput::hookLibrary(false);
+			CRawInput::unload();
+
+			if (n_sourceEXE <= 2 && !(hUnloadDLLFunc = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)UnloadDLLFunc, NULL, 0, 0)))
 			{
-				// Stop CS:GO and TF2 D3D9 hooking
-				CRawInput::hookLibrary(false);
-				CRawInput::unload();
+				// Revert to freeing DLL by returning DllMain
+				hUnloadDLLFunc = hInstance;
 
-				if (n_sourceEXE <= 2 && !(hUnloadDLLFunc = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)UnloadDLLFunc, NULL, 0, 0)))
+				if (bD3D9Hooked)
 				{
-					// Revert to freeing DLL by returning DllMain
-					hUnloadDLLFunc = hInstance;
-
 					EnterCriticalSection(&d3d9EndMutex);
 					DeleteCriticalSection(&d3d9EndMutex);
+					bD3D9Hooked = false;
 				}
-				else if (n_sourceEXE > 2)
-					hUnloadDLLFunc = hInstance;
-				// Free DLL with UnloadDLLFunc, not letting DllMain return
-				else
-					WaitForSingleObject(hUnloadDLLFunc, INFINITE);
-
-				break;
 			}
+			else if (n_sourceEXE > 2)
+				hUnloadDLLFunc = hInstance;
+			else
+				// Free DLL with UnloadDLLFunc for CS:GO and TF2
+				WaitForSingleObject(hUnloadDLLFunc, INFINITE);
+
+			break;
 	}
 
 	return 1;
+}
+
+static void unloadLibrary()
+{
+	__asm
+	{
+		push -2
+		push 0
+		push g_hInstance
+		mov eax, TerminateThread
+		push eax
+		mov eax, FreeLibrary
+		jmp eax
+	}
+}
+
+void displayError(WCHAR* pwszError)
+{
+	MessageBoxW(NULL, pwszError, L"Raw Input error!", MB_ICONERROR | MB_OK);
+	CRawInput::hookLibrary(false);
+
+	if (bD3D9Hooked)
+	{
+		EnterCriticalSection(&d3d9EndMutex);
+		DeleteCriticalSection(&d3d9EndMutex);
+		bD3D9Hooked = false;
+	}
+
+	unloadLibrary();
+}
+
+// Validate that we are working with at least Windows XP
+inline bool validateVersion()
+{
+	DWORD dwVersion = GetVersion();
+	double fCompareVersion = LOBYTE(LOWORD(dwVersion)) + 0.1 * HIBYTE(LOWORD(dwVersion));
+	return (dwVersion && fCompareVersion >= 5.1);
 }
 
 extern "C" __declspec(dllexport) void entryPoint()
@@ -173,33 +192,4 @@ extern "C" __declspec(dllexport) void entryPoint()
 
 	if (!CRawInput::pollInput())
 		displayError(L"Failed to poll mouse input");
-}
-
-static void unloadLibrary()
-{
-	__asm
-	{
-		push -2
-		push 0
-		push g_hInstance
-		mov eax, TerminateThread
-		push eax
-		mov eax, FreeLibrary
-		jmp eax
-	}
-}
-
-void displayError(WCHAR* pwszError)
-{
-	MessageBoxW(NULL, pwszError, L"Raw Input error!", MB_ICONERROR | MB_OK);
-	CRawInput::hookLibrary(false);
-	unloadLibrary();
-}
-
-// Validate that we are working with at least Windows XP
-inline bool validateVersion()
-{
-	DWORD dwVersion = GetVersion();
-	double fCompareVersion = LOBYTE(LOWORD(dwVersion)) + 0.1 * HIBYTE(LOWORD(dwVersion));
-	return (dwVersion && fCompareVersion >= 5.1);
 }

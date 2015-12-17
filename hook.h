@@ -1,8 +1,20 @@
+/********************************************************************************
+ hook.h, hook.cpp, and d3d9.cpp contain the code for fixing the bugs in
+ the CS:GO buy and escape menus, and for fixing the bugs in the TF2 MVM
+ Upgrade Station menu and some of the bugs in TF2's backpack.
+
+ Copyright (C) 2012 Hugh Bailey <obs.jim@gmail.com>
+
+ This new code was adapted from the Open Broadcaster Software source,
+ obtained from https://github.com/jp9000/OBS
+********************************************************************************/
+
 #ifndef _HOOK_H_
 #define _HOOK_H_
 
-#include <windows.h>
 #define PSAPI_VERSION 1
+
+#include <windows.h>
 #include <psapi.h>
 #include <string>
 
@@ -17,7 +29,7 @@ extern int consec_EndScene;
 extern HANDLE hUnloadDLLFunc;
 
 bool InitD3D9Capture();
-DWORD WINAPI CaptureThread(HANDLE hDllMainThread);
+DWORD WINAPI CaptureThread(LPVOID lpParameter);
 DWORD WINAPI UnloadDLLFunc(LPVOID lpParameter);
 
 typedef unsigned long UPARAM;

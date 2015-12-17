@@ -13,9 +13,8 @@
 #include <shlobj.h>
 #include <d3d9.h>
 
-HookData d3d9EndScene;
-
 CRITICAL_SECTION d3d9EndMutex;
+HookData d3d9EndScene;
 
 typedef HRESULT(STDMETHODCALLTYPE *D3D9EndScenePROC)(IDirect3DDevice9 *device);
 
@@ -125,10 +124,8 @@ DWORD WINAPI UnloadDLLFunc(LPVOID lpParameter)
 	if (bD3D9Hooked)
 	{
 		EnterCriticalSection(&d3d9EndMutex);
-
-		d3d9EndScene.Unhook();
-
 		DeleteCriticalSection(&d3d9EndMutex);
+		bD3D9Hooked = false;
 	}
 
 	CloseHandle(hUnloadDLLFunc);
