@@ -35,7 +35,6 @@
 HINSTANCE g_hInstance = NULL;
 int n_sourceEXE = 0;
 bool sourceEXE = false;
-HANDLE hUnloadDLLFunc = NULL;
 
 int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 {
@@ -84,7 +83,7 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 
 								for (int k = 1; k < 16; ++k)
 								{
-									// check hl2.exe is TF2
+									// Check hl2.exe is TF2
 									if (testTF2[k] != tf2[k])
 										n_sourceEXE = 5;
 								}
@@ -104,25 +103,6 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 			// Stop CS:GO and TF2 D3D9 hooking
 			CRawInput::hookLibrary(false);
 			CRawInput::unload();
-
-			if (n_sourceEXE <= 2 && !(hUnloadDLLFunc = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)UnloadDLLFunc, NULL, 0, 0)))
-			{
-				// Revert to freeing DLL by returning DllMain
-				hUnloadDLLFunc = hInstance;
-
-				if (bD3D9Hooked)
-				{
-					EnterCriticalSection(&d3d9EndMutex);
-					DeleteCriticalSection(&d3d9EndMutex);
-					bD3D9Hooked = false;
-				}
-			}
-			else if (n_sourceEXE > 2)
-				hUnloadDLLFunc = hInstance;
-			else
-				// Free DLL with UnloadDLLFunc for CS:GO and TF2
-				WaitForSingleObject(hUnloadDLLFunc, INFINITE);
-
 			break;
 	}
 
@@ -147,14 +127,6 @@ void displayError(WCHAR* pwszError)
 {
 	MessageBoxW(NULL, pwszError, L"Raw Input error!", MB_ICONERROR | MB_OK);
 	CRawInput::hookLibrary(false);
-
-	if (bD3D9Hooked)
-	{
-		EnterCriticalSection(&d3d9EndMutex);
-		DeleteCriticalSection(&d3d9EndMutex);
-		bD3D9Hooked = false;
-	}
-
 	unloadLibrary();
 }
 
@@ -168,12 +140,12 @@ inline bool validateVersion()
 
 extern "C" __declspec(dllexport) void entryPoint()
 {
-	HANDLE hEvent = OpenEvent(EVENT_ALL_ACCESS, FALSE, EVENTNAME);
+	HANDLE hEvent = OpenEvent(EVENT_ALL_ACCESS, FALSE, "RInputEvent32");
 
 	if (!hEvent)
 		displayError(L"Could not open interprocess communication event.");
 
-	WCHAR pwszError[ERROR_BUFFER_SIZE];
+	WCHAR pwszError[256];
 
 	if (!validateVersion())
 		displayError(L"You must at least have Microsoft Windows XP to use this library.");

@@ -1,6 +1,6 @@
 RInput Library v1.42 by Vols and Jezuz
 --------------------------------------
-RInput is an alternative to in-game raw input, which some users perceive as having input lag or other shortcomings. It also allows for raw input in games which do not have a native raw input implementation. In either case, RInput will only work for games that control aim using the Win32 API functions GetCursorPos and SetCursorPos.
+RInput is an alternative to in-game raw input, which some users perceive as having input lag or other shortcomings. It also allows for raw input in games which do not have a native raw input implementation. In either case, RInput will only work for x86 (32-bit) games that control aim using the Win32 API functions GetCursorPos and SetCursorPos.
 
 Requirements
 --------------------------------------
@@ -26,7 +26,7 @@ Compiled with Visual Studio 2008, though you may be able to get it to work with 
 - Set Enable C++ Exceptions to Yes (/EHsc), as several of the included standard C++ headers use exception handlers
 - Set Calling Convention __cdecl (/Gd), as it seems to be the only one that performs well and allows D3D9 to be hooked
 - Set the Entry Point as DllMain
-- Add shlwapi.lib, dxguid.lib, psapi.lib, comctl32.lib, and detours.lib to the Additional Dependency list in the Linker options
+- Add shlwapi.lib, dxguid.lib, comctl32.lib, and detours.lib to the Additional Dependency list in the Linker options
 - Use x86 architecture for compiling (i.e., RInput does not support x64 applications)
 - MS Detours 1.5 header and library were acquired from http://home.comcast.net/~wiccaan/downloads/Detours.rar
 

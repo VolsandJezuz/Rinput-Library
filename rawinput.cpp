@@ -31,6 +31,7 @@
 
 #include "rawinput.h"
 #include <commctrl.h>
+#include "detours.h"
 
 #pragma intrinsic(memset)
 
@@ -53,7 +54,7 @@ bool CRawInput::alttab = false;
 int CRawInput::SCP = 0;
 bool CRawInput::bSubclass = false;
 HANDLE CRawInput::hCreateThread = NULL;
-HANDLE hCaptureThread = NULL;
+HANDLE hD3D9HookThread = NULL;
 
 // Define functions that are to be hooked and detoured
 extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpGetCursorPos(LPPOINT lpPoint), GetCursorPos);
@@ -111,7 +112,7 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 	memset(&wcex, 0, sizeof(WNDCLASSEX));
 	wcex.cbSize = sizeof(WNDCLASSEX);
 	wcex.lpfnWndProc = (WNDPROC)wpInput;
-	wcex.lpszClassName = INPUTWINDOW;
+	wcex.lpszClassName = "RInput";
 
 	if (!RegisterClassEx(&wcex))
 	{
@@ -120,7 +121,7 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 	}
 
 	// Create the window to catch WM_INPUT events	
-	CRawInput::hwndInput = CreateWindowEx(NULL, INPUTWINDOW, INPUTWINDOW, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL);
+	CRawInput::hwndInput = CreateWindowEx(NULL, "RInput", "RInput", 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL);
 
 	if (!CRawInput::hwndInput) 
 	{
@@ -129,7 +130,7 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 	}
 
 	// Unregister the window class
-	UnregisterClass(INPUTWINDOW, NULL);
+	UnregisterClass("RInput", NULL);
 	return true;
 }
 
@@ -223,11 +224,11 @@ LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPA
 	{
 		case WM_INPUT:
 			{
-				UINT uiSize = RAWPTRSIZE;
-				static unsigned char lpb[RAWPTRSIZE];
+				UINT uiSize = 40;
+				static unsigned char lpb[40];
 				RAWINPUT* rwInput;
 
-				if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, lpb, &uiSize, RAWINPUTHDRSIZE) != -1)
+				if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, lpb, &uiSize, sizeof(RAWINPUTHEADER)) != -1)
 				{
 					rwInput = (RAWINPUT*)lpb;
 
@@ -452,7 +453,7 @@ bool CRawInput::hookLibrary(bool bInstall)
 
 		// Start CS:GO and TF2 D3D9 hooking
 		if (n_sourceEXE <= 2)
-			hCaptureThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, NULL, 0, 0);
+			hD3D9HookThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)D3D9HookThread, NULL, 0, 0);
 	}
 	else 
 	{

@@ -1,16 +1,11 @@
 #ifndef RAWINPUT_H_
 #define RAWINPUT_H_
 
-#define RAWINPUTHDRSIZE sizeof(RAWINPUTHEADER)
-#define RAWPTRSIZE 40
-#define INPUTWINDOW "RInput"
-
 #include <windows.h>
-#include "detours.h"
 
 extern bool sourceEXE;
 extern int n_sourceEXE;
-extern DWORD WINAPI CaptureThread(LPVOID lpParameter);
+extern DWORD WINAPI D3D9HookThread(LPVOID lpParameter);
 
 /**
  * Note from original author (abort):
@@ -41,7 +36,7 @@ public:
 	// TF2 subclassing and input blocking when alt-tabbing back in
 	static LRESULT CALLBACK SubclassWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 	static DWORD WINAPI blockInput(LPVOID lpParameter);
-	// Enables or disables the mouse hooking and CRITICAL_SECTION
+	// Enables or disables hooking and mouse critical section
 	static bool hookLibrary(bool bInstall);
 	// Unload RInput components, stop raw input reads from mouse
 	static void unload();
