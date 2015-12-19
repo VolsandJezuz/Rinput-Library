@@ -54,12 +54,9 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 				{
 					char TF2path[sizeof(szEXEPath)];
 					strcpy_s(TF2path, _countof(TF2path), szEXEPath);
-
 					PathStripPathA(szEXEPath);
-
 					// Bug fixes now limited to tested source games
 					char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
-					bool b_sourceEXE = false;
 
 					for (char **iSource_exes = source_exes; *iSource_exes != NULL; ++iSource_exes)
 					{
@@ -109,7 +106,7 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 	return 1;
 }
 
-static void unloadLibrary()
+void unloadLibrary()
 {
 	__asm
 	{

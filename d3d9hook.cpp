@@ -2,9 +2,10 @@
 #include <shlobj.h>
 #include <d3d9.h>
 
-DWORD oD3D9EndScene = 0;
+static LPDIRECT3DDEVICE9 pDevice;
+static DWORD oD3D9EndScene = 0;
 
-DWORD vtableAdd(int num, DWORD D3D9Base)
+PDWORD vtableFind(DWORD D3D9Base)
 {
 	PDWORD vtabl;
 
@@ -23,7 +24,7 @@ DWORD vtableAdd(int num, DWORD D3D9Base)
 	}
 
 	*(DWORD*)&vtabl = *(DWORD*)D3D9Base;
-	return vtabl[num];
+	return vtabl;
 }
 
 // Midhook avoids access violations if D3D9 is hooked by another program
@@ -45,25 +46,29 @@ void JMPplace(BYTE* inFunc, DWORD deFunc, DWORD len)
 
 __declspec(naked) HRESULT __stdcall D3D9EndScene()
 {
-	static LPDIRECT3DDEVICE9 pDevice;
-
-	__asm mov edi, edi
-	__asm push ebp
-	__asm mov ebp, esp
-	__asm mov eax, dword ptr ss : [ebp + 0x8]
-	__asm mov pDevice, eax
-	__asm pushad
+	__asm
+	{
+		mov edi, edi
+		push ebp
+		mov ebp, esp
+		mov eax, dword ptr ss:[ebp + 0x8]
+		mov pDevice, eax
+		pushad
+	}
 
 	if (consec_EndScene < 6)
 		++consec_EndScene;
 
-	__asm popad
-	__asm jmp[oD3D9EndScene]
+	__asm
+	{
+		popad
+		jmp[oD3D9EndScene]
+	}
 }
 
 DWORD WINAPI D3D9HookThread(LPVOID lpParameter)
 {
-	DWORD vtableBase = 0;
+	PDWORD vtableBase;
 	HMODULE hD3D9Dll = NULL;
 
 	while (!hD3D9Dll)
@@ -72,11 +77,11 @@ DWORD WINAPI D3D9HookThread(LPVOID lpParameter)
 		Sleep(150);
 	}
 	
-	if (vtableBase = vtableAdd(42, (DWORD)hD3D9Dll))
+	if (vtableBase = vtableFind((DWORD)hD3D9Dll))
 	{
 		// D3D9 device vtable found
-		oD3D9EndScene = vtableBase + 5;
-		JMPplace((PBYTE)(oD3D9EndScene - 5), (DWORD)D3D9EndScene, 5);
+		oD3D9EndScene = vtableBase[42] + 5;
+		JMPplace((PBYTE)vtableBase[42], (DWORD)D3D9EndScene, 5);
 	}
 
 	CloseHandle(hD3D9HookThread);
