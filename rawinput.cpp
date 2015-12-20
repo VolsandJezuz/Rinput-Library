@@ -29,12 +29,13 @@
 	along with RInput.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "rawinput.h"
-#include <commctrl.h>
+#include "stdafx.h"
 #include "detours.h"
+#include <commctrl.h>
 
 #pragma intrinsic(memset)
 
+// Initialize static variables
 HWND CRawInput::hwndClient = NULL;
 bool CRawInput::TF2unblock = false;
 long CRawInput::hold_x = 0;
@@ -48,13 +49,11 @@ CRITICAL_SECTION CRawInput::rawMouseData;
 long CRawInput::x = 0;
 long CRawInput::y = 0;
 int CRawInput::signal = 0;
-int consec_EndScene = 0;
 int CRawInput::consecG = 2;
 bool CRawInput::alttab = false;
 int CRawInput::SCP = 0;
 bool CRawInput::bSubclass = false;
 HANDLE CRawInput::hCreateThread = NULL;
-HANDLE hD3D9HookThread = NULL;
 
 // Define functions that are to be hooked and detoured
 extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpGetCursorPos(LPPOINT lpPoint), GetCursorPos);
@@ -85,7 +84,7 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 	if (CRawInput::hwndClient)
 	{
 		// TF2 Window must be active for backpack fixes to work
-		if (n_sourceEXE == 2 && GetForegroundWindow() != CRawInput::hwndClient)
+		if (n_sourceEXE == TF2 && GetForegroundWindow() != CRawInput::hwndClient)
 		{
 			CRawInput::TF2unblock = true;
 			BlockInput(TRUE);
@@ -149,7 +148,7 @@ bool CRawInput::initInput(WCHAR* pwszError)
 	memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
 
 	// Flag allows accumulation to continue for TF2 while alt-tabbed
-	if (n_sourceEXE == 2)
+	if (n_sourceEXE == TF2)
 		rMouse.dwFlags = RIDEV_INPUTSINK;
 	else
 		rMouse.dwFlags = 0;
@@ -267,15 +266,15 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 	CRawInput::set_x = (long)x;
 	CRawInput::set_y = (long)y;
 
-	if (sourceEXE)
+	if (n_sourceEXE != NOBUGFIXES)
 	{
-		if (n_sourceEXE == 2)
+		if (n_sourceEXE == TF2)
 		{
 			if (CRawInput::signal >= 1)
 				++CRawInput::signal;
 
 			// Bug fix for Steam overlay in TF2 backpack
-			if (consec_EndScene == 6 && CRawInput::consecG == 3 && !CRawInput::alttab)
+			if (consec_EndScene == MAX_CONSEC_ENDSCENE && CRawInput::consecG == MAX_CONSECG && !CRawInput::alttab)
 			{
 				if (CRawInput::SCP == 0)
 					CRawInput::SCP = -1;
@@ -301,7 +300,7 @@ skipGreset:
 		}
 		else if (CRawInput::SCP == 2)
 		{
-			if (n_sourceEXE != 2)
+			if (n_sourceEXE != TF2)
 				CRawInput::SCP = 0;
 
 			consec_EndScene = 0;
@@ -329,7 +328,7 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 
 	LeaveCriticalSection(&CRawInput::rawMouseData);
 
-	if (n_sourceEXE == 2)
+	if (n_sourceEXE == TF2)
 	{
 		if (CRawInput::signal >= 1)
 			++CRawInput::signal;
@@ -340,11 +339,11 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 			CRawInput::bSubclass = false;
 		}
 
-		if (CRawInput::consecG < 3)
+		if (CRawInput::consecG < MAX_CONSECG)
 			++CRawInput::consecG;
 
 		// Bug fix for cursor hitting side of screen in TF2 backpack
-		if (CRawInput::consecG == 3)
+		if (CRawInput::consecG == MAX_CONSECG)
 		{
 			if (CRawInput::set_x >= CRawInput::hold_x * 2)
 				CRawInput::set_x = CRawInput::hold_x * 2 - 1;
@@ -374,10 +373,10 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 
 	if (!CRawInput::alttab)
 	{
-		if (consec_EndScene == 6)
+		if (consec_EndScene == MAX_CONSEC_ENDSCENE)
 		{
 			// Needed to not break backpack in TF2
-			if (!(CRawInput::SCP != 1 && CRawInput::consecG == 3))
+			if (!(CRawInput::SCP != 1 && CRawInput::consecG == MAX_CONSECG))
 			{
 				if (!CRawInput::hwndClient)
 					CRawInput::hwndClient = CRawInput::clientWindow(GetCurrentProcessId());

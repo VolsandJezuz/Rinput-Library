@@ -1,19 +1,26 @@
-#ifndef RAWINPUT_H_
-#define RAWINPUT_H_
+#pragma once
+
+#define STRICT
+#define WINVER 0x0501
+#define _WIN32_WINDOWS 0x0501
+#define _WIN32_WINNT 0x0501
+#define WIN32_LEAN_AND_MEAN
+#define KERNEL_LIB L"kernel32.dll"
+#define RINPUTVER "v1.42"
+#define RINPUTFVER 1,42
+#define TF2 2
+#define NOBUGFIXES 4
+#define MAX_CONSEC_ENDSCENE 6
+#define MAX_CONSECG 3
 
 #include <windows.h>
 
-extern bool sourceEXE;
+extern int consec_EndScene;
+extern HANDLE hD3D9HookThread;
 extern int n_sourceEXE;
-extern DWORD WINAPI D3D9HookThread(LPVOID lpParameter);
 
-/**
- * Note from original author (abort):
- * ----------------------------------
- * Sadly everything has been made static, as Win32 API does not support object oriented callbacks, as it has been written in C.
- * To keep the performance as high as possible, I decided not to work with storing the class instance through Win32 API. 
- * Feel free to rewrite this to something more clean in coding terms :).
- */
+DWORD WINAPI D3D9HookThread(LPVOID lpParameter);
+
 class CRawInput
 {
 public:
@@ -61,5 +68,3 @@ private:
 	static bool bSubclass;
 	static HANDLE hCreateThread;
 };
-
-#endif

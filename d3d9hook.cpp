@@ -1,6 +1,6 @@
-#include "d3d9hook.h"
-#include <shlobj.h>
+#include "stdafx.h"
 #include <d3d9.h>
+#include <shlobj.h>
 
 static LPDIRECT3DDEVICE9 pDevice;
 static DWORD oD3D9EndScene = 0;
@@ -56,7 +56,7 @@ __declspec(naked) HRESULT __stdcall D3D9EndScene()
 		pushad
 	}
 
-	if (consec_EndScene < 6)
+	if (consec_EndScene < MAX_CONSEC_ENDSCENE)
 		++consec_EndScene;
 
 	__asm

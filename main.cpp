@@ -29,12 +29,14 @@
 	along with RInput.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "main.h"
+#include "stdafx.h"
+#include <string>
 #include <shlwapi.h>
 
-HINSTANCE g_hInstance = NULL;
-int n_sourceEXE = 0;
-bool sourceEXE = false;
+static HINSTANCE g_hInstance = NULL;
+
+// Expose the entry point function called by RInput.exe
+extern "C" __declspec(dllexport) void entryPoint();
 
 int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 {
@@ -64,9 +66,7 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 
 						if ((std::string)szEXEPath == (std::string)*iSource_exes)
 						{
-							sourceEXE = true;
-
-							if (n_sourceEXE == 2)
+							if (n_sourceEXE == TF2)
 							{
 								// Make sure hl2.exe is TF2
 								PathRemoveFileSpecA(TF2path);
@@ -82,7 +82,7 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 								{
 									// Check hl2.exe is TF2
 									if (testTF2[k] != tf2[k])
-										n_sourceEXE = 5;
+										n_sourceEXE = NOBUGFIXES;
 								}
 							}
 
@@ -91,7 +91,7 @@ int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 					}
 				}
 				else
-					n_sourceEXE = 4;
+					n_sourceEXE = NOBUGFIXES;
 			}
 
 			break;

@@ -248,23 +248,11 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\d3d9hook.h"
-				>
-			</File>
-			<File
 				RelativePath=".\detours.h"
 				>
 			</File>
 			<File
-				RelativePath=".\main.h"
-				>
-			</File>
-			<File
-				RelativePath=".\rawinput.h"
-				>
-			</File>
-			<File
-				RelativePath=".\versioninfo.h"
+				RelativePath=".\stdafx.h"
 				>
 			</File>
 		</Filter>
@@ -273,10 +261,6 @@
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
-			<File
-				RelativePath=".\icon.ico"
-				>
-			</File>
 			<File
 				RelativePath=".\versioninfo.rc"
 				>
@@ -297,6 +281,10 @@
 			</File>
 			<File
 				RelativePath=".\rawinput.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\stdafx.cpp"
 				>
 			</File>
 		</Filter>
