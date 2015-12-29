@@ -6,11 +6,11 @@
 #define _WIN32_WINNT 0x0501
 #define WIN32_LEAN_AND_MEAN
 #define KERNEL_LIB L"kernel32.dll"
-#define RINPUTVER "v1.42"
-#define RINPUTFVER 1,42
+#define RINPUTVER "v1.43"
+#define RINPUTFVER 1,43
 #define TF2 2
 #define NOBUGFIXES 4
-#define MAX_CONSEC_ENDSCENE 6
+#define MAX_CONSEC_ENDSCENE 7
 #define MAX_CONSECG 3
 
 #include <windows.h>

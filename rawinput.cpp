@@ -233,7 +233,7 @@ LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPA
 
 					if (!rwInput->header.dwType)
 					{
-						// Avoid collisions with hGetCursorPos
+						// Avoid collisions with hGet/SetCursorPos
 						EnterCriticalSection(&CRawInput::rawMouseData);
 
 						// Accumulate cursor pos change from raw packets
@@ -278,14 +278,11 @@ int __stdcall CRawInput::hSetCursorPos(int x, int y)
 			{
 				if (CRawInput::SCP == 0)
 					CRawInput::SCP = -1;
-
-				goto skipGreset;
 			}
-
-			CRawInput::consecG = 0;
+			else
+				CRawInput::consecG = 0;
 		}
 
-skipGreset:
 		++CRawInput::SCP;
 
 		// Alt-tab bug fix
@@ -295,8 +292,13 @@ skipGreset:
 		// Console and buy menu bug fixes
 		if (CRawInput::SCP == 1)
 		{
+			// Avoid collisions with accumulation of raw input packets
+			EnterCriticalSection(&CRawInput::rawMouseData);
+
 			CRawInput::set_x -= CRawInput::x;
 			CRawInput::set_y -= CRawInput::y;
+
+			LeaveCriticalSection(&CRawInput::rawMouseData);
 		}
 		else if (CRawInput::SCP == 2)
 		{
