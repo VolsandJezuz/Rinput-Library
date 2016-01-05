@@ -8,7 +8,8 @@
 //  Copyright 1995-2001, Microsoft Corporation
 //
 
-#pragma once
+#ifndef _DETOURS_H_
+#define _DETOURS_H_
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -607,5 +608,6 @@ inline PBYTE DetourGenNop(PBYTE pbCode)
 #endif DETOURS_INTERAL
 #endif // __cplusplus
 
+#endif // _DETOURS_H_ 
 //
 ////////////////////////////////////////////////////////////////  End of File.

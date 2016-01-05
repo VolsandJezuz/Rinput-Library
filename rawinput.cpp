@@ -29,48 +29,85 @@
 	along with RInput.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "stdafx.h"
-#include "detours.h"
-#include <commctrl.h>
+#include "rawinput.h"
 
 #pragma intrinsic(memset)
 
-// Initialize static variables
+// Define functions that are to be hooked and detoured
+extern "C" DETOUR_TRAMPOLINE(BOOL WINAPI TrmpGetCursorPos(LPPOINT lpPoint), GetCursorPos);
+extern "C" DETOUR_TRAMPOLINE(BOOL WINAPI TrmpSetCursorPos(int x, int y), SetCursorPos);
+
+unsigned char CRawInput::n_sourceEXE = 0;
 HWND CRawInput::hwndClient = NULL;
 bool CRawInput::TF2unblock = false;
+POINT CRawInput::centerPoint;
+long CRawInput::leftBoundary = 0;
+long CRawInput::rightBoundary = 0;
+long CRawInput::topBoundary = 0;
+long CRawInput::bottomBoundary = 0;
 long CRawInput::hold_x = 0;
 long CRawInput::hold_y = 0;
-POINT CRawInput::centerPoint;
+CRITICAL_SECTION CRawInput::rawMouseData;
+long CRawInput::x = 0;
+long CRawInput::y = 0;
 HWND CRawInput::hwndInput = NULL;
 long CRawInput::set_x = 0;
 long CRawInput::set_y = 0;
 bool CRawInput::bRegistered = false;
-CRITICAL_SECTION CRawInput::rawMouseData;
-long CRawInput::x = 0;
-long CRawInput::y = 0;
-int CRawInput::signal = 0;
-int CRawInput::consecG = 2;
-bool CRawInput::alttab = false;
-int CRawInput::SCP = 0;
+unsigned char CRawInput::signal = 0;
 bool CRawInput::bSubclass = false;
 HANDLE CRawInput::hCreateThread = NULL;
-
-// Define functions that are to be hooked and detoured
-extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpGetCursorPos(LPPOINT lpPoint), GetCursorPos);
-extern "C" DETOUR_TRAMPOLINE(int __stdcall TrmpSetCursorPos(int x, int y), SetCursorPos);
-
-struct WindowHandleStructure
-{
-	unsigned long PID;
-	HWND WindowHandle;
-};
+unsigned char CRawInput::consecG = 2;
+bool CRawInput::alttab = false;
+unsigned char CRawInput::consec_EndScene = 0;
+char CRawInput::SCP = 0;
+HANDLE CRawInput::hD3D9HookThread = NULL;
+DWORD CRawInput::oD3D9EndScene = 0;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
-	if (!initWindow(pwszError))
+	char szEXEPath[MAX_PATH];
+
+	// Detect source games for enabling specific bug fixes
+	if (GetModuleFileNameA(NULL, (LPCH)szEXEPath, (DWORD)sizeof(szEXEPath)))
+	{
+		char TF2path[sizeof(szEXEPath)];
+		strcpy_s(TF2path, sizeof(TF2path), (const char*)szEXEPath);
+		PathStripPathA((LPSTR)szEXEPath);
+		char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
+		
+		// Bug fixes now limited to tested source games
+		for (++CRawInput::n_sourceEXE; source_exes[CRawInput::n_sourceEXE - 1] != NULL; ++CRawInput::n_sourceEXE)
+		{
+			if ((std::string)szEXEPath == (std::string)source_exes[CRawInput::n_sourceEXE - 1])
+			{
+				if (CRawInput::n_sourceEXE == TF2)
+				{
+					PathRemoveFileSpecA((LPSTR)TF2path);
+					char tf2[16] = "Team Fortress 2";
+
+					// Make sure hl2.exe is TF2
+					for (size_t k = 0; k < 15; ++k)
+					{
+						if (TF2path[((std::string)TF2path).size() + k - 15] != tf2[k])
+						{
+							++CRawInput::n_sourceEXE;
+							break;
+						}
+					}
+				}
+
+				break;
+			}
+		}
+	}
+	else
+		CRawInput::n_sourceEXE = NO_BUG_FIXES;
+
+	if (!CRawInput::initWindow(pwszError))
 		return false;
 
-	if (!initInput(pwszError))
+	if (!CRawInput::initInput(pwszError))
 		return false;
 
 	return true;
@@ -79,12 +116,12 @@ bool CRawInput::initialize(WCHAR* pwszError)
 bool CRawInput::initWindow(WCHAR* pwszError)
 {
 	// Identify the window that matches the injected process
-	CRawInput::hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
+	EnumWindows(CRawInput::EnumWindowsProc, (LPARAM)GetCurrentProcessId());
 
 	if (CRawInput::hwndClient)
 	{
 		// TF2 Window must be active for backpack fixes to work
-		if (n_sourceEXE == TF2 && GetForegroundWindow() != CRawInput::hwndClient)
+		if (CRawInput::n_sourceEXE == TF2 && GetForegroundWindow() != CRawInput::hwndClient)
 		{
 			CRawInput::TF2unblock = true;
 			BlockInput(TRUE);
@@ -110,7 +147,7 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 	WNDCLASSEX wcex;
 	memset(&wcex, 0, sizeof(WNDCLASSEX));
 	wcex.cbSize = sizeof(WNDCLASSEX);
-	wcex.lpfnWndProc = (WNDPROC)wpInput;
+	wcex.lpfnWndProc = (WNDPROC)CRawInput::wpInput;
 	wcex.lpszClassName = "RInput";
 
 	if (!RegisterClassEx(&wcex))
@@ -133,110 +170,66 @@ bool CRawInput::initWindow(WCHAR* pwszError)
 	return true;
 }
 
-bool CRawInput::initInput(WCHAR* pwszError)
-{
-	POINT defCor;
-
-	// Raw input accumulators initialized to starting cursor position
-	if (GetCursorPos(&defCor))
-	{
-		CRawInput::set_x = defCor.x;
-		CRawInput::set_y = defCor.y;
-	}
-
-	RAWINPUTDEVICE rMouse;
-	memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
-
-	// Flag allows accumulation to continue for TF2 while alt-tabbed
-	if (n_sourceEXE == TF2)
-		rMouse.dwFlags = RIDEV_INPUTSINK;
-	else
-		rMouse.dwFlags = 0;
-
-	rMouse.hwndTarget = CRawInput::hwndInput;
-	rMouse.usUsagePage = 0x01;
-	rMouse.usUsage = 0x02;
-
-	if (!RegisterRawInputDevices(&rMouse, 1, sizeof(RAWINPUTDEVICE)))
-	{
-		lstrcpyW(pwszError, L"Failed to register raw input device!");
-		return false;
-	}
-
-	return (bRegistered = true);
-}
-
 BOOL CALLBACK CRawInput::EnumWindowsProc(HWND WindowHandle, LPARAM lParam)
 {
 	unsigned long PID = 0;
-	WindowHandleStructure* data = reinterpret_cast<WindowHandleStructure*>(lParam);
 	GetWindowThreadProcessId(WindowHandle, &PID);
 
-	if (data->PID != PID || GetWindow(WindowHandle, GW_OWNER) || !IsWindowVisible(WindowHandle))
+	if (PID != (unsigned long)lParam || GetWindow(WindowHandle, GW_OWNER) || !IsWindowVisible(WindowHandle))
 		return TRUE;
 
 	// Found visible, main program window matching current process ID
-	data->WindowHandle = WindowHandle;
+	CRawInput::hwndClient = WindowHandle;
 	return FALSE;
-}
-
-HWND CRawInput::clientWindow(unsigned long PID)
-{
-	WindowHandleStructure data = {PID, NULL};
-	EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&data));
-	return data.WindowHandle;
 }
 
 bool CRawInput::clientCenter()
 {
 	RECT rectClient;
 
+	// Try to get relative window center
 	if (GetClientRect(CRawInput::hwndClient, &rectClient))
 	{
-		// Calculated relative window center
-		long xClient = rectClient.right / 2;
-		long yClient = rectClient.bottom / 2;
-		centerPoint.x = xClient;
-		centerPoint.y = yClient;
+		CRawInput::centerPoint.x = (long)((unsigned long)rectClient.right / 2);
+		CRawInput::centerPoint.y = (long)((unsigned long)rectClient.bottom / 2);
 
-		if (ClientToScreen(CRawInput::hwndClient, &centerPoint))
-			// Translated relative window center to resolution coords
+		// Try to translate relative window center to absolute coords
+		if (ClientToScreen(CRawInput::hwndClient, &CRawInput::centerPoint))
+		{
+			// Get absolute coords of game display monitor for TF2
+			if (CRawInput::n_sourceEXE == TF2)
+			{
+				CRawInput::leftBoundary = (long)GetSystemMetrics(SM_XVIRTUALSCREEN);
+				CRawInput::rightBoundary = (long)(GetSystemMetrics(SM_XVIRTUALSCREEN) + GetSystemMetrics(SM_CXVIRTUALSCREEN));
+				CRawInput::topBoundary = (long)GetSystemMetrics(SM_YVIRTUALSCREEN);
+				CRawInput::bottomBoundary = (long)(GetSystemMetrics(SM_YVIRTUALSCREEN) + GetSystemMetrics(SM_CYVIRTUALSCREEN));
+			}
+
 			return true;
+		}
 	}
 	
 	return false;
 }
 
-unsigned int CRawInput::pollInput()
-{
-	MSG msg;
-
-	while (GetMessage(&msg, CRawInput::hwndInput, 0, 0) != 0)
-		DispatchMessage(&msg);
-
-	return msg.message;
-}
-
-LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
 	{
 		case WM_INPUT:
 			{
 				UINT uiSize = 40;
-				static unsigned char lpb[40];
-				RAWINPUT* rwInput;
+				static BYTE lpb[40];
 
 				if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, lpb, &uiSize, sizeof(RAWINPUTHEADER)) != -1)
 				{
-					rwInput = (RAWINPUT*)lpb;
+					RAWINPUT* rwInput = (RAWINPUT*)lpb;
 
 					if (!rwInput->header.dwType)
 					{
-						// Avoid collisions with hGet/SetCursorPos
 						EnterCriticalSection(&CRawInput::rawMouseData);
 
-						// Accumulate cursor pos change from raw packets
+						// Accumulate cursor position change
 						CRawInput::x += rwInput->data.mouse.lLastX;
 						CRawInput::y += rwInput->data.mouse.lLastY;
 
@@ -258,86 +251,83 @@ LRESULT __stdcall CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPA
 	return 0;
 }
 
-int __stdcall CRawInput::hSetCursorPos(int x, int y)
+bool CRawInput::initInput(WCHAR* pwszError)
 {
-	if (!TrmpSetCursorPos(x, y))
-		return 1;
+	POINT defCor;
 
-	CRawInput::set_x = (long)x;
-	CRawInput::set_y = (long)y;
-
-	if (n_sourceEXE != NOBUGFIXES)
+	// Raw input accumulators initialized to starting cursor position
+	if (GetCursorPos(&defCor))
 	{
-		if (n_sourceEXE == TF2)
-		{
-			if (CRawInput::signal >= 1)
-				++CRawInput::signal;
-
-			// Bug fix for Steam overlay in TF2 backpack
-			if (consec_EndScene == MAX_CONSEC_ENDSCENE && CRawInput::consecG == MAX_CONSECG && !CRawInput::alttab)
-			{
-				if (CRawInput::SCP == 0)
-					CRawInput::SCP = -1;
-			}
-			else
-				CRawInput::consecG = 0;
-		}
-
-		++CRawInput::SCP;
-
-		// Alt-tab bug fix
-		if (CRawInput::set_x == 0 && CRawInput::set_y == 0)
-			CRawInput::alttab = true;
-
-		// Console and buy menu bug fixes
-		if (CRawInput::SCP == 1)
-		{
-			// Avoid collisions with accumulation of raw input packets
-			EnterCriticalSection(&CRawInput::rawMouseData);
-
-			CRawInput::set_x -= CRawInput::x;
-			CRawInput::set_y -= CRawInput::y;
-
-			LeaveCriticalSection(&CRawInput::rawMouseData);
-		}
-		else if (CRawInput::SCP == 2)
-		{
-			if (n_sourceEXE != TF2)
-				CRawInput::SCP = 0;
-
-			consec_EndScene = 0;
-
-			CRawInput::alttab = false;
-
-			CRawInput::hold_x = CRawInput::set_x;
-			CRawInput::hold_y = CRawInput::set_y;
-		}
+		CRawInput::set_x = defCor.x;
+		CRawInput::set_y = defCor.y;
 	}
 
-	return 0;
+	RAWINPUTDEVICE rMouse;
+	memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
+
+	// Flag allows accumulation to continue for TF2 while alt-tabbed
+	if (CRawInput::n_sourceEXE == TF2)
+		rMouse.dwFlags = RIDEV_INPUTSINK;
+	else
+		rMouse.dwFlags = 0;
+
+	rMouse.hwndTarget = CRawInput::hwndInput;
+	rMouse.usUsagePage = 0x01;
+	rMouse.usUsage = 0x02;
+
+	if (!RegisterRawInputDevices(&rMouse, 1, (UINT)sizeof(RAWINPUTDEVICE)))
+	{
+		lstrcpyW(pwszError, L"Failed to register raw input device!");
+		return false;
+	}
+
+	return (CRawInput::bRegistered = true);
 }
 
-int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
+bool CRawInput::hookLibrary(bool bInstall)
 {
-	// Avoid collisions with accumulation of raw input packets
+	if (bInstall)
+	{
+		if (!DetourFunctionWithTrampoline((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos) || !DetourFunctionWithTrampoline((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos))
+			return false;
+
+		// Avoid collisions with accumulation of raw input packets
+		InitializeCriticalSection(&CRawInput::rawMouseData);
+
+		// Start CS:GO and TF2 D3D9 hooking
+		if (CRawInput::n_sourceEXE <= 2)
+			CRawInput::hD3D9HookThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CRawInput::D3D9HookThread, NULL, 0, 0);
+	}
+	else 
+	{
+		DetourRemove((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos);
+		DetourRemove((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos);
+
+		DeleteCriticalSection(&CRawInput::rawMouseData);
+	}
+
+	return true;
+}
+
+BOOL WINAPI CRawInput::hGetCursorPos(LPPOINT lpPoint)
+{
 	EnterCriticalSection(&CRawInput::rawMouseData);
 
 	// Split off raw input handling to accumulate independently
 	CRawInput::set_x += CRawInput::x;
 	CRawInput::set_y += CRawInput::y;
-	CRawInput::x = 0;
-	CRawInput::y = 0;
+	CRawInput::x = CRawInput::y = 0;
 
 	LeaveCriticalSection(&CRawInput::rawMouseData);
 
-	if (n_sourceEXE == TF2)
+	if (CRawInput::n_sourceEXE == TF2)
 	{
 		if (CRawInput::signal >= 1)
 			++CRawInput::signal;
 		else if (CRawInput::bSubclass)
 		{
 			// TF2 backpack fix not applied when in actual game
-			RemoveWindowSubclass(CRawInput::hwndClient, CRawInput::SubclassWndProc, 0);
+			RemoveWindowSubclass(CRawInput::hwndClient, (SUBCLASSPROC)CRawInput::SubclassWndProc, 0);
 			CRawInput::bSubclass = false;
 		}
 
@@ -347,26 +337,26 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 		// Bug fix for cursor hitting side of screen in TF2 backpack
 		if (CRawInput::consecG == MAX_CONSECG)
 		{
-			if (CRawInput::set_x >= CRawInput::hold_x * 2)
-				CRawInput::set_x = CRawInput::hold_x * 2 - 1;
-			else if (CRawInput::set_x < 0)
-				CRawInput::set_x = 0;
+				if (CRawInput::set_x < CRawInput::leftBoundary)
+					CRawInput::set_x = CRawInput::leftBoundary;
+				else if (CRawInput::set_x >= CRawInput::rightBoundary)
+					CRawInput::set_x = CRawInput::rightBoundary - 1;
 
-			if (CRawInput::set_y >= CRawInput::hold_y * 2)
-				CRawInput::set_y = CRawInput::hold_y * 2 - 1;
-			else if (CRawInput::set_y < 0)
-				CRawInput::set_y = 0;
+				if (CRawInput::set_y < CRawInput::topBoundary)
+					CRawInput::set_y = CRawInput::topBoundary;
+				else if (CRawInput::set_y >= CRawInput::bottomBoundary)
+					CRawInput::set_y = CRawInput::bottomBoundary - 1;
 
 			// Fix for subtle TF2 backpack bug from alt-tabbing
 			if (!CRawInput::bSubclass)
 			{
 				if (!CRawInput::hwndClient)
-					CRawInput::hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
+					EnumWindows(CRawInput::EnumWindowsProc, (LPARAM)GetCurrentProcessId());
 
 				if (CRawInput::hwndClient)
 				{
 					// When in TF2 backpack, monitor its window messages
-					SetWindowSubclass(CRawInput::hwndClient, CRawInput::SubclassWndProc, 0, 1);
+					SetWindowSubclass(CRawInput::hwndClient, (SUBCLASSPROC)CRawInput::SubclassWndProc, 0, 1);
 					CRawInput::bSubclass = true;
 				}
 			}
@@ -375,20 +365,23 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 
 	if (!CRawInput::alttab)
 	{
-		if (consec_EndScene == MAX_CONSEC_ENDSCENE)
+		// Buy and escape menu bug fixes
+		if (CRawInput::consec_EndScene == MAX_CONSEC_ENDSCENE)
 		{
+			if (!CRawInput::hwndClient)
+				EnumWindows(CRawInput::EnumWindowsProc, (LPARAM)GetCurrentProcessId());
+
+			if (CRawInput::hwndClient && CRawInput::clientCenter())
+			{
+				CRawInput::hold_x = CRawInput::centerPoint.x;
+				CRawInput::hold_y = CRawInput::centerPoint.y;
+			}
+
 			// Needed to not break backpack in TF2
 			if (!(CRawInput::SCP != 1 && CRawInput::consecG == MAX_CONSECG))
 			{
-				if (!CRawInput::hwndClient)
-					CRawInput::hwndClient = CRawInput::clientWindow(GetCurrentProcessId());
-
-				// Buy and escape menu bug fixes
-				if (CRawInput::hwndClient && CRawInput::clientCenter())
-				{
-					CRawInput::set_x = CRawInput::centerPoint.x;
-					CRawInput::set_y = CRawInput::centerPoint.y;
-				}
+				CRawInput::set_x = CRawInput::hold_x;
+				CRawInput::set_y = CRawInput::hold_y;
 			}
 		}
 
@@ -403,7 +396,7 @@ int __stdcall CRawInput::hGetCursorPos(LPPOINT lpPoint)
 	}
 
 	CRawInput::SCP = 0;
-	return 0;
+	return FALSE;
 }
 
 LRESULT CALLBACK CRawInput::SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
@@ -417,7 +410,7 @@ LRESULT CALLBACK CRawInput::SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 			break;
 
 		case WM_NCDESTROY:
-			RemoveWindowSubclass(hWnd, CRawInput::SubclassWndProc, uIdSubclass);
+			RemoveWindowSubclass(hWnd, (SUBCLASSPROC)CRawInput::SubclassWndProc, uIdSubclass);
 			break;
 
 		default:
@@ -431,9 +424,9 @@ DWORD WINAPI CRawInput::blockInput(LPVOID lpParameter)
 {
 	BlockInput(TRUE);
 
-	// Unblock input after 9 SetCursorPos and/or GetCursorPos calls
-	for (size_t q = 0; CRawInput::signal < 10; ++q)
-		Sleep(16);
+	// Unblock input after 11 SetCursorPos and/or GetCursorPos calls
+	while (CRawInput::signal <= 12)
+		Sleep(30);
 
 	CRawInput::signal = 0;
 
@@ -443,33 +436,172 @@ DWORD WINAPI CRawInput::blockInput(LPVOID lpParameter)
 	return 1;
 }
 
-bool CRawInput::hookLibrary(bool bInstall)
+BOOL WINAPI CRawInput::hSetCursorPos(int x, int y)
 {
-	if (bInstall)
+	if (!TrmpSetCursorPos(x, y))
+		return TRUE;
+
+	CRawInput::set_x = (long)x;
+	CRawInput::set_y = (long)y;
+
+	if (CRawInput::n_sourceEXE != NO_BUG_FIXES)
 	{
-		if (!DetourFunctionWithTrampoline((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos) || !DetourFunctionWithTrampoline((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos))
-			return false;
+		if (CRawInput::n_sourceEXE == TF2)
+		{
+			if (CRawInput::signal >= 1)
+				++CRawInput::signal;
 
-		InitializeCriticalSection(&CRawInput::rawMouseData);
+			// Bug fix for Steam overlay in TF2 backpack
+			if (CRawInput::consec_EndScene == MAX_CONSEC_ENDSCENE && CRawInput::consecG == MAX_CONSECG && !CRawInput::alttab)
+			{
+				if (CRawInput::SCP == 0)
+					--CRawInput::SCP;
+			}
+			else
+				CRawInput::consecG = 0;
+		}
 
-		// Start CS:GO and TF2 D3D9 hooking
-		if (n_sourceEXE <= 2)
-			hD3D9HookThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)D3D9HookThread, NULL, 0, 0);
+		++CRawInput::SCP;
+
+		// Alt-tab bug fix
+		if (CRawInput::set_x == 0 && CRawInput::set_y == 0)
+			CRawInput::alttab = true;
+
+		// Console and buy menu bug fixes
+		if (CRawInput::SCP == 1)
+		{
+			CRawInput::set_x -= CRawInput::x;
+			CRawInput::set_y -= CRawInput::y;
+		}
+		else if (CRawInput::SCP == 2)
+		{
+			if (CRawInput::n_sourceEXE != TF2)
+				CRawInput::SCP = 0;
+
+			CRawInput::consec_EndScene = 0;
+
+			CRawInput::alttab = false;
+
+			if (CRawInput::hold_x != CRawInput::set_x || CRawInput::hold_y != CRawInput::set_y)
+			{
+				if (!CRawInput::hwndClient)
+					EnumWindows(CRawInput::EnumWindowsProc, (LPARAM)GetCurrentProcessId());
+
+				if (CRawInput::hwndClient && CRawInput::clientCenter())
+				{
+					CRawInput::hold_x = CRawInput::centerPoint.x;
+					CRawInput::hold_y = CRawInput::centerPoint.y;
+				}
+				else
+				{
+					CRawInput::hold_x = CRawInput::set_x;
+					CRawInput::hold_y = CRawInput::set_y;
+				}
+			}
+		}
 	}
-	else 
+
+	return FALSE;
+}
+
+DWORD WINAPI CRawInput::D3D9HookThread(LPVOID lpParameter)
+{
+	PDWORD vtableBase;
+	HMODULE hD3D9Dll = NULL;
+
+	while (!hD3D9Dll)
 	{
-		DetourRemove((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos);
-		DetourRemove((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos);
-
-		DeleteCriticalSection(&CRawInput::rawMouseData);
+		hD3D9Dll = GetModuleHandleA("d3d9.dll");
+		Sleep(150);
+	}
+	
+	if (vtableBase = CRawInput::vtableFind((DWORD)hD3D9Dll))
+	{
+		// D3D9 device vtable found
+		CRawInput::oD3D9EndScene = vtableBase[42] + 5;
+		CRawInput::JMPplace((PBYTE)vtableBase[42], (DWORD)CRawInput::D3D9EndScene, 5);
 	}
 
-	return true;
+	CloseHandle(CRawInput::hD3D9HookThread);
+	return 1;
+}
+
+PDWORD CRawInput::vtableFind(DWORD D3D9Base)
+{
+	PDWORD vtabl;
+
+	for (DWORD g = 0; g < 0x1c3000; ++g)
+	{
+		++D3D9Base;
+
+		// Alternative to signature search with FindPattern
+		if ((*(WORD*)(D3D9Base + 0x00)) == 0x06C7 && (*(WORD*)(D3D9Base + 0x06)) == 0x8689 && (*(WORD*)(D3D9Base + 0x0C)) == 0x8689)
+		{
+			D3D9Base += 2;
+			break;
+		}
+		else if (g >= 0x1c3000)
+			return 0;
+	}
+
+	*(DWORD*)&vtabl = *(DWORD*)D3D9Base;
+	return vtabl;
+}
+
+// Midhook avoids access violations if D3D9 is hooked by another program
+void CRawInput::JMPplace(PBYTE inFunc, DWORD deFunc, DWORD len)
+{
+	DWORD oldPro = 0;
+	VirtualProtect((LPVOID)inFunc, (SIZE_T)len, PAGE_EXECUTE_READWRITE, &oldPro);
+	DWORD relAddress = 0;
+	relAddress = (deFunc - (DWORD)inFunc) - 5;
+	*inFunc = 0xE9;
+	*((DWORD *)(inFunc + 0x1)) = relAddress;
+	
+	for (DWORD x = 0x5; x < len; ++x)
+		*(inFunc + x) = 0x90;
+	
+	DWORD newPro = 0;
+	VirtualProtect((LPVOID)inFunc, (SIZE_T)len, oldPro, &newPro);
+}
+
+__declspec(naked) HRESULT WINAPI CRawInput::D3D9EndScene()
+{
+	static LPDIRECT3DDEVICE9 pDevice;
+
+	__asm
+	{
+		mov edi, edi
+		push ebp
+		mov ebp, esp
+		mov eax, dword ptr ss:[ebp + 0x8]
+		mov pDevice, eax
+		pushad
+	}
+
+	if (pDevice && CRawInput::consec_EndScene < MAX_CONSEC_ENDSCENE)
+		++CRawInput::consec_EndScene;
+
+	__asm
+	{
+		popad
+		jmp[CRawInput::oD3D9EndScene]
+	}
+}
+
+UINT CRawInput::pollInput()
+{
+	MSG msg;
+
+	while (GetMessage(&msg, CRawInput::hwndInput, 0, 0) != 0)
+		DispatchMessage(&msg);
+
+	return msg.message;
 }
 
 void CRawInput::unload()
 {
-	if (bRegistered && CRawInput::hwndInput)
+	if (CRawInput::bRegistered && CRawInput::hwndInput)
 	{
 		RAWINPUTDEVICE rMouse;
 		memset(&rMouse, 0, sizeof(RAWINPUTDEVICE));
@@ -477,8 +609,8 @@ void CRawInput::unload()
 		rMouse.hwndTarget = NULL;
 		rMouse.usUsagePage = 0x01;
 		rMouse.usUsage = 0x02;
-		RegisterRawInputDevices(&rMouse, 1, sizeof(RAWINPUTDEVICE));
+		RegisterRawInputDevices(&rMouse, 1, (UINT)sizeof(RAWINPUTDEVICE));
 
-		DestroyWindow(hwndInput);
+		DestroyWindow(CRawInput::hwndInput);
 	}
 }

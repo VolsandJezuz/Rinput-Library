@@ -79,7 +79,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				UseUnicodeResponseFiles="false"
-				AdditionalDependencies="shlwapi.lib dxguid.lib comctl32.lib detours.lib"
+				AdditionalDependencies="detours.lib dxguid.lib shlwapi.lib comctl32.lib"
 				Version="1.43-debug"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft SDKs\Windows\v6.0A\Lib&quot;;&quot;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Lib\x86&quot;"
@@ -189,7 +189,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				UseUnicodeResponseFiles="false"
-				AdditionalDependencies="shlwapi.lib dxguid.lib comctl32.lib detours.lib"
+				AdditionalDependencies="detours.lib dxguid.lib shlwapi.lib comctl32.lib"
 				Version="1.43"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft SDKs\Windows\v6.0A\Lib&quot;;&quot;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Lib\x86&quot;"
@@ -252,7 +252,15 @@
 				>
 			</File>
 			<File
-				RelativePath=".\stdafx.h"
+				RelativePath=".\main.h"
+				>
+			</File>
+			<File
+				RelativePath=".\rawinput.h"
+				>
+			</File>
+			<File
+				RelativePath=".\versioninfo.h"
 				>
 			</File>
 		</Filter>
@@ -272,19 +280,11 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\d3d9hook.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\main.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\rawinput.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\stdafx.cpp"
 				>
 			</File>
 		</Filter>

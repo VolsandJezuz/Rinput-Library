@@ -29,106 +29,34 @@
 	along with RInput.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "stdafx.h"
-#include <string>
-#include <shlwapi.h>
+#include "main.h"
 
 static HINSTANCE g_hInstance = NULL;
 
-// Expose the entry point function called by RInput.exe
-extern "C" __declspec(dllexport) void entryPoint();
-
-int __stdcall DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
+BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 {
 	switch(dwReason)
 	{
 		case DLL_PROCESS_ATTACH:
 			// No need for a threaded entry
 			if (!DisableThreadLibraryCalls(hInstance))
-				return 0;
-			else
-			{
-				g_hInstance = hInstance;
-				char szEXEPath[MAX_PATH];
+				return FALSE;
 
-				// Detect source games for enabling specific bug fixes
-				if (GetModuleFileNameA(NULL, szEXEPath, sizeof(szEXEPath)))
-				{
-					char TF2path[sizeof(szEXEPath)];
-					strcpy_s(TF2path, _countof(TF2path), szEXEPath);
-					PathStripPathA(szEXEPath);
-					// Bug fixes now limited to tested source games
-					char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
-
-					for (char **iSource_exes = source_exes; *iSource_exes != NULL; ++iSource_exes)
-					{
-						++n_sourceEXE;
-
-						if ((std::string)szEXEPath == (std::string)*iSource_exes)
-						{
-							if (n_sourceEXE == TF2)
-							{
-								// Make sure hl2.exe is TF2
-								PathRemoveFileSpecA(TF2path);
-								std::string sTF2path = (std::string)TF2path;
-								char testTF2[16];
-
-								for (size_t j = 1; j <= 15; ++j)
-									testTF2[j] = TF2path[sTF2path.size() + j - 15];
-
-								char tf2[16] = "Team Fortress 2";
-
-								for (int k = 1; k < 16; ++k)
-								{
-									// Check hl2.exe is TF2
-									if (testTF2[k] != tf2[k])
-										n_sourceEXE = NOBUGFIXES;
-								}
-							}
-
-							break;
-						}
-					}
-				}
-				else
-					n_sourceEXE = NOBUGFIXES;
-			}
-
+			g_hInstance = hInstance;
 			break;
 
 		case DLL_PROCESS_DETACH:
-			// Stop CS:GO and TF2 D3D9 hooking
+			// Unhook cursor functions and unload from injected process
 			CRawInput::hookLibrary(false);
 			CRawInput::unload();
 			break;
 	}
 
-	return 1;
-}
-
-void unloadLibrary()
-{
-	__asm
-	{
-		push -2
-		push 0
-		push g_hInstance
-		mov eax, TerminateThread
-		push eax
-		mov eax, FreeLibrary
-		jmp eax
-	}
-}
-
-void displayError(WCHAR* pwszError)
-{
-	MessageBoxW(NULL, pwszError, L"Raw Input error!", MB_ICONERROR | MB_OK);
-	CRawInput::hookLibrary(false);
-	unloadLibrary();
+	return TRUE;
 }
 
 // Validate that we are working with at least Windows XP
-inline bool validateVersion()
+bool validateVersion()
 {
 	DWORD dwVersion = GetVersion();
 	double fCompareVersion = LOBYTE(LOWORD(dwVersion)) + 0.1 * HIBYTE(LOWORD(dwVersion));
@@ -161,4 +89,25 @@ extern "C" __declspec(dllexport) void entryPoint()
 
 	if (!CRawInput::pollInput())
 		displayError(L"Failed to poll mouse input");
+}
+
+void unloadLibrary()
+{
+	__asm
+	{
+		push -2
+		push 0
+		push g_hInstance
+		mov eax, TerminateThread
+		push eax
+		mov eax, FreeLibrary
+		jmp eax
+	}
+}
+
+void displayError(WCHAR* pwszError)
+{
+	MessageBoxW(NULL, pwszError, L"Raw Input error!", MB_ICONERROR | MB_OK);
+	CRawInput::hookLibrary(FALSE);
+	unloadLibrary();
 }
