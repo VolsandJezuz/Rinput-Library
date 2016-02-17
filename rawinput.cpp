@@ -104,6 +104,9 @@ bool CRawInput::initialize(WCHAR* pwszError)
 	else
 		CRawInput::n_sourceEXE = NO_BUG_FIXES;
 
+	// Avoid collisions with accumulation of raw input packets
+	InitializeCriticalSection(&CRawInput::rawMouseData);
+
 	if (!CRawInput::initWindow(pwszError))
 		return false;
 
@@ -291,9 +294,6 @@ bool CRawInput::hookLibrary(bool bInstall)
 		if (!DetourFunctionWithTrampoline((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos) || !DetourFunctionWithTrampoline((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos))
 			return false;
 
-		// Avoid collisions with accumulation of raw input packets
-		InitializeCriticalSection(&CRawInput::rawMouseData);
-
 		// Start CS:GO and TF2 D3D9 hooking
 		if (CRawInput::n_sourceEXE <= 2)
 			CRawInput::hD3D9HookThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CRawInput::D3D9HookThread, NULL, 0, 0);
@@ -424,9 +424,18 @@ DWORD WINAPI CRawInput::blockInput(LPVOID lpParameter)
 {
 	BlockInput(TRUE);
 
+	long SleepTimer = 0;
+
 	// Unblock input after 11 SetCursorPos and/or GetCursorPos calls
 	while (CRawInput::signal <= 12)
+	{
+		SleepTimer += 30;
+
+		if (SleepTimer >= 2000)
+			break;
+
 		Sleep(30);
+	}
 
 	CRawInput::signal = 0;
 

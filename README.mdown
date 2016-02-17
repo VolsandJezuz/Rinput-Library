@@ -1,4 +1,4 @@
-# RInput Library v1.43 by Vols and Jezuz
+# RInput Library v1.44 by Vols and Jezuz
 RInput is an alternative to in-game raw input, which some users perceive as having input lag or other shortcomings. It also allows for raw input in games which do not have a native raw input implementation. In either case, RInput will only work for x86 (32-bit) games that control aim using the Win32 API functions GetCursorPos and SetCursorPos.
 
 ## Requirements

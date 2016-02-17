@@ -108,6 +108,6 @@ void unloadLibrary()
 void displayError(WCHAR* pwszError)
 {
 	MessageBoxW(NULL, pwszError, L"Raw Input error!", MB_ICONERROR | MB_OK);
-	CRawInput::hookLibrary(FALSE);
+	CRawInput::hookLibrary(false);
 	unloadLibrary();
 }
