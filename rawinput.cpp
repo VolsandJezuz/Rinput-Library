@@ -37,7 +37,7 @@
 extern "C" DETOUR_TRAMPOLINE(BOOL WINAPI TrmpGetCursorPos(LPPOINT lpPoint), GetCursorPos);
 extern "C" DETOUR_TRAMPOLINE(BOOL WINAPI TrmpSetCursorPos(int x, int y), SetCursorPos);
 
-unsigned char CRawInput::n_sourceEXE = 0;
+unsigned char CRawInput::n_sourceEXE = 1;
 HWND CRawInput::hwndClient = NULL;
 bool CRawInput::TF2unblock = false;
 POINT CRawInput::centerPoint;
@@ -66,38 +66,33 @@ DWORD CRawInput::oD3D9EndScene = 0;
 
 bool CRawInput::initialize(WCHAR* pwszError)
 {
-	char szEXEPath[MAX_PATH];
+	wchar_t szEXEPath[MAX_PATH];
 
 	// Detect source games for enabling specific bug fixes
-	if (GetModuleFileNameA(NULL, (LPCH)szEXEPath, (DWORD)sizeof(szEXEPath)))
+	if (GetModuleFileNameW(NULL, szEXEPath, sizeof(szEXEPath)))
 	{
-		char TF2path[sizeof(szEXEPath)];
-		strcpy_s(TF2path, sizeof(TF2path), (const char*)szEXEPath);
-		PathStripPathA((LPSTR)szEXEPath);
-		char *source_exes[] = {"csgo.exe", "hl2.exe", "portal2.exe", NULL};
-		
+		wchar_t TF2path[sizeof(szEXEPath)];
+		wcscpy_s(TF2path, sizeof(TF2path), szEXEPath);
+		PathStripPathW(szEXEPath);
+		wchar_t *source_exes[] = {L"csgo.exe", L"hl2.exe", L"portal2.exe", NULL};
+				
 		// Bug fixes now limited to tested source games
-		for (++CRawInput::n_sourceEXE; source_exes[CRawInput::n_sourceEXE - 1] != NULL; ++CRawInput::n_sourceEXE)
+		while (source_exes[CRawInput::n_sourceEXE - 1] != NULL && wcscmp(szEXEPath, source_exes[CRawInput::n_sourceEXE - 1]))
+			++CRawInput::n_sourceEXE;
+		if (CRawInput::n_sourceEXE == TF2)
 		{
-			if ((std::string)szEXEPath == (std::string)source_exes[CRawInput::n_sourceEXE - 1])
+			PathRemoveFileSpecW(TF2path);
+			wchar_t tf2[16] = L"Team Fortress 2";
+
+			// Make sure hl2.exe is TF2
+			for (size_t k = 0; k < 15; ++k)
 			{
-				if (CRawInput::n_sourceEXE == TF2)
+				if (TF2path[((std::wstring)TF2path).size() + k - 15] != tf2[k])
 				{
-					PathRemoveFileSpecA((LPSTR)TF2path);
-					char tf2[16] = "Team Fortress 2";
-
-					// Make sure hl2.exe is TF2
-					for (size_t k = 0; k < 15; ++k)
-					{
-						if (TF2path[((std::string)TF2path).size() + k - 15] != tf2[k])
-						{
-							++CRawInput::n_sourceEXE;
-							break;
-						}
-					}
+					// Treat other hl2 games like portal and exit loop
+					++CRawInput::n_sourceEXE;
+					k += 15 - k;
 				}
-
-				break;
 			}
 		}
 	}
@@ -178,7 +173,7 @@ BOOL CALLBACK CRawInput::EnumWindowsProc(HWND WindowHandle, LPARAM lParam)
 	unsigned long PID = 0;
 	GetWindowThreadProcessId(WindowHandle, &PID);
 
-	if (PID != (unsigned long)lParam || GetWindow(WindowHandle, GW_OWNER) || !IsWindowVisible(WindowHandle))
+	if (PID != (unsigned long)lParam || (GetWindow(WindowHandle, GW_OWNER) && !IsWindowVisible(WindowHandle)))
 		return TRUE;
 
 	// Found visible, main program window matching current process ID
@@ -230,12 +225,10 @@ LRESULT CALLBACK CRawInput::wpInput(HWND hWnd, UINT message, WPARAM wParam, LPAR
 
 					if (!rwInput->header.dwType)
 					{
-						EnterCriticalSection(&CRawInput::rawMouseData);
-
 						// Accumulate cursor position change
+						EnterCriticalSection(&CRawInput::rawMouseData);
 						CRawInput::x += rwInput->data.mouse.lLastX;
 						CRawInput::y += rwInput->data.mouse.lLastY;
-
 						LeaveCriticalSection(&CRawInput::rawMouseData);
 					}
 				}
@@ -278,7 +271,7 @@ bool CRawInput::initInput(WCHAR* pwszError)
 	rMouse.usUsagePage = 0x01;
 	rMouse.usUsage = 0x02;
 
-	if (!RegisterRawInputDevices(&rMouse, 1, (UINT)sizeof(RAWINPUTDEVICE)))
+	if (!RegisterRawInputDevices(&rMouse, 1, sizeof(RAWINPUTDEVICE)))
 	{
 		lstrcpyW(pwszError, L"Failed to register raw input device!");
 		return false;
@@ -302,8 +295,10 @@ bool CRawInput::hookLibrary(bool bInstall)
 	{
 		DetourRemove((PBYTE)TrmpGetCursorPos, (PBYTE)CRawInput::hGetCursorPos);
 		DetourRemove((PBYTE)TrmpSetCursorPos, (PBYTE)CRawInput::hSetCursorPos);
-
 		DeleteCriticalSection(&CRawInput::rawMouseData);
+
+		if (CRawInput::hD3D9HookThread)
+			CloseHandle(CRawInput::hD3D9HookThread);
 	}
 
 	return true;
@@ -311,13 +306,11 @@ bool CRawInput::hookLibrary(bool bInstall)
 
 BOOL WINAPI CRawInput::hGetCursorPos(LPPOINT lpPoint)
 {
-	EnterCriticalSection(&CRawInput::rawMouseData);
-
 	// Split off raw input handling to accumulate independently
+	EnterCriticalSection(&CRawInput::rawMouseData);
 	CRawInput::set_x += CRawInput::x;
 	CRawInput::set_y += CRawInput::y;
 	CRawInput::x = CRawInput::y = 0;
-
 	LeaveCriticalSection(&CRawInput::rawMouseData);
 
 	if (CRawInput::n_sourceEXE == TF2)
@@ -423,24 +416,17 @@ LRESULT CALLBACK CRawInput::SubclassWndProc(HWND hWnd, UINT uMsg, WPARAM wParam,
 DWORD WINAPI CRawInput::blockInput(LPVOID lpParameter)
 {
 	BlockInput(TRUE);
+	unsigned char SleepTimer = 0;
 
-	long SleepTimer = 0;
-
-	// Unblock input after 11 SetCursorPos and/or GetCursorPos calls
-	while (CRawInput::signal <= 12)
+	// Unblock input after 11 SetCursorPos/GetCursorPos or 2 seconds
+	while (CRawInput::signal <= 12 && SleepTimer < 67)
 	{
-		SleepTimer += 30;
-
-		if (SleepTimer >= 2000)
-			break;
-
+		++SleepTimer;
 		Sleep(30);
 	}
 
 	CRawInput::signal = 0;
-
-	BlockInput(FALSE);
-	
+	BlockInput(FALSE);	
 	CloseHandle(CRawInput::hCreateThread);
 	return 1;
 }
@@ -461,11 +447,8 @@ BOOL WINAPI CRawInput::hSetCursorPos(int x, int y)
 				++CRawInput::signal;
 
 			// Bug fix for Steam overlay in TF2 backpack
-			if (CRawInput::consec_EndScene == MAX_CONSEC_ENDSCENE && CRawInput::consecG == MAX_CONSECG && !CRawInput::alttab)
-			{
-				if (CRawInput::SCP == 0)
-					--CRawInput::SCP;
-			}
+			if (CRawInput::consec_EndScene == MAX_CONSEC_ENDSCENE && CRawInput::consecG == MAX_CONSECG && !CRawInput::alttab && CRawInput::SCP == 0)
+				--CRawInput::SCP;
 			else
 				CRawInput::consecG = 0;
 		}
@@ -515,7 +498,6 @@ BOOL WINAPI CRawInput::hSetCursorPos(int x, int y)
 
 DWORD WINAPI CRawInput::D3D9HookThread(LPVOID lpParameter)
 {
-	PDWORD vtableBase;
 	HMODULE hD3D9Dll = NULL;
 
 	while (!hD3D9Dll)
@@ -523,38 +505,64 @@ DWORD WINAPI CRawInput::D3D9HookThread(LPVOID lpParameter)
 		hD3D9Dll = GetModuleHandleA("d3d9.dll");
 		Sleep(150);
 	}
-	
-	if (vtableBase = CRawInput::vtableFind((DWORD)hD3D9Dll))
+
+	DWORD D3D9Base = (DWORD)hD3D9Dll;
+	DWORD oldEndScene = 0;
+	DWORD dwVersion = GetVersion();
+	double fCompareVersion = LOBYTE(LOWORD(dwVersion)) + 0.1 * HIBYTE(LOWORD(dwVersion));
+
+	// Windows versions have different EndScene memory patterns
+	if (fCompareVersion >= 6.2)
 	{
-		// D3D9 device vtable found
-		CRawInput::oD3D9EndScene = vtableBase[42] + 5;
-		CRawInput::JMPplace((PBYTE)vtableBase[42], (DWORD)CRawInput::D3D9EndScene, 5);
+		// Windows 8, Windows 8.1, and Windows 10
+		for (DWORD g = 0; g < 0x128000; ++g)
+		{
+			++D3D9Base;
+
+			if ((*(WORD*)(D3D9Base + 0x00)) == 0xFF8B && (*(WORD*)(D3D9Base + 0x02)) == 0x8B55 && (*(WORD*)(D3D9Base + 0x04)) == 0xFFEC && (*(WORD*)(D3D9Base + 0x06)) == 0x0875 && (*(WORD*)(D3D9Base + 0x08)) == 0x018B && (*(WORD*)(D3D9Base + 0x0A)) == 0x3E6A && (*(WORD*)(D3D9Base + 0x0C)) == 0x90FF)
+			{
+				oldEndScene = D3D9Base;
+				break;
+			}
+		}
+	}
+	else if (fCompareVersion >= 6.0)
+	{
+		// Windows Vista and Windows 7
+		for (DWORD g = 0; g < 0x128000; ++g)
+		{
+			++D3D9Base;
+
+			if ((*(WORD*)(D3D9Base + 0x00)) == 0xFF8B && (*(WORD*)(D3D9Base + 0x02)) == 0x8B55 && (*(WORD*)(D3D9Base + 0x04)) == 0x8BEC && (*(WORD*)(D3D9Base + 0x06)) == 0x0855 && (*(WORD*)(D3D9Base + 0x08)) == 0x018B && (*(WORD*)(D3D9Base + 0x0A)) == 0x808B && (*(WORD*)(D3D9Base + 0x0C)) == 0x00F4 && (*(WORD*)(D3D9Base + 0x0E)) == 0x0000 && (*(WORD*)(D3D9Base + 0x10)) == 0x6A52 && (*(WORD*)(D3D9Base + 0x12)) == 0xFF3E && (*(WORD*)(D3D9Base + 0x14)) == 0x5DD0 && (*(WORD*)(D3D9Base + 0x16)) == 0x04C2)
+			{
+				oldEndScene = D3D9Base;
+				break;
+			}
+		}
+	}
+	else if (fCompareVersion >= 5.1)
+	{
+		// Windows XP
+		for (DWORD g = 0; g < 0x128000; ++g)
+		{
+			++D3D9Base;
+
+			if ((*(WORD*)(D3D9Base + 0x00)) == 0xFF8B && (*(WORD*)(D3D9Base + 0x02)) == 0x8B55 && (*(WORD*)(D3D9Base + 0x04)) == 0x8BEC && (*(WORD*)(D3D9Base + 0x06)) == 0x0855 && (*(WORD*)(D3D9Base + 0x08)) == 0x018B && (*(WORD*)(D3D9Base + 0x0A)) == 0x6A52)
+			{
+				oldEndScene = D3D9Base;
+				break;
+			}
+		}
+	}
+	
+	if (oldEndScene)
+	{
+		CRawInput::oD3D9EndScene = oldEndScene + 5;
+		CRawInput::JMPplace((PBYTE)oldEndScene, (DWORD)CRawInput::D3D9EndScene, 5);
 	}
 
 	CloseHandle(CRawInput::hD3D9HookThread);
 	return 1;
-}
-
-PDWORD CRawInput::vtableFind(DWORD D3D9Base)
-{
-	PDWORD vtabl;
-
-	for (DWORD g = 0; g < 0x1c3000; ++g)
-	{
-		++D3D9Base;
-
-		// Alternative to signature search with FindPattern
-		if ((*(WORD*)(D3D9Base + 0x00)) == 0x06C7 && (*(WORD*)(D3D9Base + 0x06)) == 0x8689 && (*(WORD*)(D3D9Base + 0x0C)) == 0x8689)
-		{
-			D3D9Base += 2;
-			break;
-		}
-		else if (g >= 0x1c3000)
-			return 0;
-	}
-
-	*(DWORD*)&vtabl = *(DWORD*)D3D9Base;
-	return vtabl;
 }
 
 // Midhook avoids access violations if D3D9 is hooked by another program
@@ -618,8 +626,7 @@ void CRawInput::unload()
 		rMouse.hwndTarget = NULL;
 		rMouse.usUsagePage = 0x01;
 		rMouse.usUsage = 0x02;
-		RegisterRawInputDevices(&rMouse, 1, (UINT)sizeof(RAWINPUTDEVICE));
-
+		RegisterRawInputDevices(&rMouse, 1, sizeof(RAWINPUTDEVICE));
 		DestroyWindow(CRawInput::hwndInput);
 	}
 }

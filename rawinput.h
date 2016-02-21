@@ -70,8 +70,7 @@ private:
 	static DWORD WINAPI blockInput(LPVOID lpParameter);
 	// D3D9 hooking for CS:GO and TF2
 	static DWORD WINAPI D3D9HookThread(LPVOID lpParameter);
-	static PDWORD vtableFind(DWORD D3D9Base);
-	static void JMPplace(BYTE* inFunc, DWORD deFunc, DWORD len);
+	static void JMPplace(PBYTE inFunc, DWORD deFunc, DWORD len);
 	static HRESULT WINAPI D3D9EndScene();
 };
 
